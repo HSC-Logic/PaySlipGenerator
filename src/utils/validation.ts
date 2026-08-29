@@ -1,0 +1,29 @@
+import type { Errors, PaymentSlip } from '../types'
+import { finalTotal } from './currency'
+const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+export const validateSlip = (slip: PaymentSlip): Errors => {
+  const e: Errors = {}
+  if (!slip.company.name.trim()) e['company.name'] = 'Company name is required.'
+  if (!slip.company.address.trim()) e['company.address'] = 'Company address is required.'
+  if (!/^#[0-9a-f]{6}$/i.test(slip.company.themeColor)) e['company.themeColor'] = 'Enter a valid six-digit hex color.'
+  if (slip.company.email && !email.test(slip.company.email)) e['company.email'] = 'Enter a valid email address.'
+  if (!slip.recipient.name.trim()) e['recipient.name'] = 'Recipient name is required.'
+  if (!slip.recipient.role.trim()) e['recipient.role'] = 'Role or designation is required.'
+  if (slip.recipient.email && !email.test(slip.recipient.email)) e['recipient.email'] = 'Enter a valid email address.'
+  if (!slip.payment.date || Number.isNaN(Date.parse(slip.payment.date))) e['payment.date'] = 'A valid payment date is required.'
+  if (!slip.payment.reference.trim()) e['payment.reference'] = 'Payment reference is required.'
+  if (!slip.payment.title.trim()) e['payment.title'] = 'Payment purpose is required.'
+  slip.items.forEach((item, i) => {
+    if (!item.description.trim()) e[`items.${i}.description`] = 'Description is required.'
+    if (!(Number(item.quantity) > 0)) e[`items.${i}.quantity`] = 'Quantity must be greater than zero.'
+    if (item.rate === '' || Number(item.rate) < 0) e[`items.${i}.rate`] = 'Enter a non-negative rate.'
+  })
+  if (!slip.items.length) e.items = 'Add at least one payment item.'
+  slip.adjustments.forEach((entry, i) => {
+    if (!entry.label.trim()) e[`adjustments.${i}.label`] = 'Enter a label.'
+    if (entry.value === '' || Number(entry.value) < 0) e[`adjustments.${i}.value`] = 'Enter a non-negative value.'
+    if (entry.mode === 'percentage' && Number(entry.value) > 100 && entry.kind === 'discount') e[`adjustments.${i}.value`] = 'Discount cannot exceed 100%.'
+  })
+  if (finalTotal(slip.items, slip.payment.adjustment, slip.adjustments) < 0) e.adjustment = 'Final total cannot be negative.'
+  return e
+}
