@@ -21,7 +21,7 @@ A private, browser-based payment-slip workspace for creating professional A4 pay
 
 ## Local development
 
-Requires Node.js 20 or newer.
+Requires Node.js 24 or newer.
 
 ```bash
 npm install
@@ -48,6 +48,8 @@ For local development, set `VITE_BASE_PATH=/`. For a repository Pages site, use 
 3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 4. Push to `main`, or open **Actions → Deploy to GitHub Pages → Run workflow**.
 5. When the workflow completes, the site is available at `https://USERNAME.github.io/REPOSITORY-NAME/`.
+
+Pages must be enabled once before the first workflow run. If `actions/configure-pages` reports `Get Pages site failed: Not Found`, open **Settings → Pages**, select **GitHub Actions** as the source, save the setting, and rerun the failed workflow. The standard workflow token cannot initialize a previously disabled Pages site automatically; the action's `enablement` option requires a separate elevated token, so this project intentionally uses the safer one-time settings step.
 
 The workflow calculates the correct Vite base path from the repository name. For a custom domain, add the domain in Pages settings and change the workflow's `VITE_BASE_PATH` to `/` (and add a `public/CNAME` file if appropriate).
 
