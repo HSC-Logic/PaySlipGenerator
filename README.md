@@ -15,7 +15,7 @@ A private, browser-based payment-slip workspace for creating professional A4 pay
 - Fixed or percentage discounts, VAT/tax, service, delivery, and custom charges
 - Sharp, text-based A4 PDF export through jsPDF (not a screenshot)
 - Print stylesheet that prints only the payment slip
-- Browser-local saved company profile, drafts, and reference sequence
+- Browser-local saved company profile, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
 - Field-level validation, accessible labels, notices, and loading states
 - Optional, session-only Google Drive OAuth and Google Docs creation
 - Automated calculation/reference tests and GitHub Pages deployment workflow
@@ -90,11 +90,16 @@ The application lists folders that the granted `drive.file` scope makes availabl
 - Local browser data is not encrypted; avoid using a shared browser profile for sensitive records and clear site data when appropriate.
 - Uploaded logos are limited to image files smaller than 2 MB.
 
+### Payment reference persistence
+
+Each new payment reserves the next browser-local reference in the form `PS-2026-0001`. The yearly counter and issued-reference list are stored in `localStorage`; the active reference is also held in `sessionStorage` so refreshing the same tab does not consume another number. “Another slip” and the generate-reference button explicitly reserve the next number. Manual edits are preserved in the payment and in saved drafts. Existing legacy yearly counters and higher `PS-…` references found in the saved draft are used when choosing the next sequence.
+
 ## Known limitations
 
 - Browser storage belongs to one browser profile/device and is not synchronized or backed up.
 - Clearing site data removes saved settings, drafts, and the local reference sequence.
-- Reference numbers are unique only within the current browser profile and year.
+- Reference numbers are unique only within the locally available browser profile and year. Separate devices/profiles are not coordinated, and simultaneous creation in multiple tabs is not an atomic distributed operation.
+- Reserved or deleted payments can leave sequence gaps; references are intentionally not reused.
 - Google authorization requires an owner-supplied OAuth client ID and correct authorized origins.
 - The minimum Drive scope can limit which pre-existing folders are listed.
 - Very large numbers beyond normal payment ranges are not intended for the amount-in-words converter.
