@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { errorsForStep } from './validation'
+import type { PaymentSlip } from '../types'
+import { errorsForStep, validateSlip } from './validation'
+
+const validSlip = (): PaymentSlip => ({
+  company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#0b1f3a' },
+  recipient: { name: 'Example Recipient', identification: '', role: 'Consultant', address: '', email: '', telephone: '' },
+  payment: { date: '2026-08-31', reference: 'PAY-001', title: 'Services', method: 'Cash', bankName: '', transactionReference: '', notes: '', adjustment: '', currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' },
+  items: [{ id: '1', description: 'Consulting', quantity: 1, rate: 0 }],
+  adjustments: [],
+})
 
 describe('workflow validation', () => {
   const errors = {
@@ -17,5 +26,31 @@ describe('workflow validation', () => {
 
   it('shows all errors during review', () => {
     expect(errorsForStep(errors, 'review')).toEqual(errors)
+  })
+
+  it('accepts empty optional fields', () => {
+    expect(validateSlip(validSlip())).toEqual({})
+  })
+
+  it('rejects malformed and out-of-range numeric values', () => {
+    const slip = validSlip()
+    slip.items[0].quantity = Number.NaN
+    slip.items[0].rate = Number.NaN
+    slip.payment.adjustment = Number.NaN
+    slip.adjustments = [{ id: 'a', label: 'Discount', kind: 'discount', mode: 'percentage', value: Number.NaN }]
+    const result = validateSlip(slip)
+    expect(result['items.0.quantity']).toBe('Enter a quantity greater than zero.')
+    expect(result['items.0.rate']).toBe('Enter a valid rate of zero or more.')
+    expect(result.adjustment).toBe('Enter a valid adjustment amount.')
+    expect(result['adjustments.0.value']).toBe('Enter a valid value of zero or more.')
+  })
+
+  it('rejects malformed optional email values only when provided', () => {
+    const slip = validSlip()
+    slip.company.email = 'not-an-email'
+    slip.recipient.email = 'also-invalid'
+    const result = validateSlip(slip)
+    expect(result['company.email']).toBe('Enter a valid email address.')
+    expect(result['recipient.email']).toBe('Enter a valid email address.')
   })
 })

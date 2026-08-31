@@ -15,16 +15,17 @@ export const validateSlip = (slip: PaymentSlip): Errors => {
   if (!slip.payment.title.trim()) e['payment.title'] = 'Payment purpose is required.'
   slip.items.forEach((item, i) => {
     if (!item.description.trim()) e[`items.${i}.description`] = 'Description is required.'
-    if (!(Number(item.quantity) > 0)) e[`items.${i}.quantity`] = 'Quantity must be greater than zero.'
-    if (item.rate === '' || Number(item.rate) < 0) e[`items.${i}.rate`] = 'Enter a non-negative rate.'
+    if (item.quantity === '' || !Number.isFinite(Number(item.quantity)) || !(Number(item.quantity) > 0)) e[`items.${i}.quantity`] = 'Enter a quantity greater than zero.'
+    if (item.rate === '' || !Number.isFinite(Number(item.rate)) || Number(item.rate) < 0) e[`items.${i}.rate`] = 'Enter a valid rate of zero or more.'
   })
   if (!slip.items.length) e.items = 'Add at least one payment item.'
   slip.adjustments.forEach((entry, i) => {
     if (!entry.label.trim()) e[`adjustments.${i}.label`] = 'Enter a label.'
-    if (entry.value === '' || Number(entry.value) < 0) e[`adjustments.${i}.value`] = 'Enter a non-negative value.'
+    if (entry.value === '' || !Number.isFinite(Number(entry.value)) || Number(entry.value) < 0) e[`adjustments.${i}.value`] = 'Enter a valid value of zero or more.'
     if (entry.mode === 'percentage' && Number(entry.value) > 100 && entry.kind === 'discount') e[`adjustments.${i}.value`] = 'Discount cannot exceed 100%.'
   })
-  if (finalTotal(slip.items, slip.payment.adjustment, slip.adjustments) < 0) e.adjustment = 'Final total cannot be negative.'
+  if (slip.payment.adjustment !== '' && !Number.isFinite(Number(slip.payment.adjustment))) e.adjustment = 'Enter a valid adjustment amount.'
+  else if (finalTotal(slip.items, slip.payment.adjustment, slip.adjustments) < 0) e.adjustment = 'Reduce the deduction so the final total is not negative.'
   return e
 }
 
