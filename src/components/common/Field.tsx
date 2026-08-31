@@ -3,12 +3,12 @@ import { createContext, useContext, useId, type InputHTMLAttributes, type ReactN
 type FieldContextValue = { controlId: string; descriptionId?: string; errorKey?: string }
 const FieldContext = createContext<FieldContextValue | null>(null)
 
-type Props = { label: string; error?: string; errorKey?: string; hint?: string; children?: ReactNode; required?: boolean; controlId?: string }
-export const Field = ({ label, error, errorKey, hint, children, required, controlId: suppliedId }: Props) => {
+type Props = { label: string; error?: string; errorKey?: string; hint?: string; children?: ReactNode; required?: boolean; controlId?: string; className?: string }
+export const Field = ({ label, error, errorKey, hint, children, required, controlId: suppliedId, className = '' }: Props) => {
   const generatedId = useId()
   const controlId = suppliedId || `field-${generatedId.replace(/:/g, '')}`
   const descriptionId = error || hint ? `${controlId}-${error ? 'error' : 'hint'}` : undefined
-  return <FieldContext.Provider value={{ controlId, descriptionId, errorKey }}><div className={`field ${error ? 'has-error' : ''}`}>
+  return <FieldContext.Provider value={{ controlId, descriptionId, errorKey }}><div className={`field ${className} ${error ? 'has-error' : ''}`.trim()}>
     <label htmlFor={controlId}>{label}{required && <span className="required-mark" aria-hidden="true"> *</span>}</label>
     {children}
     {error && <small id={descriptionId} className="error">{error}</small>}
