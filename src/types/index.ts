@@ -12,3 +12,4 @@ export interface TotalAdjustment { id: string; label: string; kind: AdjustmentKi
 export interface PaymentSlip { company: Company; recipient: Recipient; payment: Payment; items: PaymentItem[]; adjustments: TotalAdjustment[] }
 export interface GoogleDriveState { connected: boolean; folderId: string; folderName: string; documentUrl: string }
 export type Errors = Record<string, string>
+export type WorkflowStep = 'company' | 'recipient' | 'payment' | 'review'

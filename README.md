@@ -5,6 +5,7 @@ A private, browser-based payment-slip workspace for creating professional A4 pay
 ## Features
 
 - Live A4 payment-slip preview with responsive desktop and mobile layouts
+- Guided Company → Recipient → Payment → Review workflow with preserved form state
 - Company, recipient, payment, line-item, adjustment, and signature details
 - Selectable LKR, USD, EUR, GBP, INR, AUD, CAD, and SGD formatting with currency-aware amount-in-words conversion
 - Optional custom bottom seal such as “Thank You”, “Paid”, or “Received”

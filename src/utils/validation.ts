@@ -1,4 +1,4 @@
-import type { Errors, PaymentSlip } from '../types'
+import type { Errors, PaymentSlip, WorkflowStep } from '../types'
 import { finalTotal } from './currency'
 const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const validateSlip = (slip: PaymentSlip): Errors => {
@@ -26,4 +26,10 @@ export const validateSlip = (slip: PaymentSlip): Errors => {
   })
   if (finalTotal(slip.items, slip.payment.adjustment, slip.adjustments) < 0) e.adjustment = 'Final total cannot be negative.'
   return e
+}
+
+export const errorsForStep = (errors: Errors, step: WorkflowStep): Errors => {
+  if (step === 'review') return errors
+  const prefix = step === 'company' ? 'company.' : step === 'recipient' ? 'recipient.' : ''
+  return Object.fromEntries(Object.entries(errors).filter(([key]) => step === 'payment' ? !key.startsWith('company.') && !key.startsWith('recipient.') : key.startsWith(prefix)))
 }
