@@ -85,7 +85,7 @@ describe('PDF document generation', () => {
       expect(output.indexOf('ITEM45MARKER')).toBeLessThan(output.lastIndexOf('TOTAL'))
       const pages = pdf.internal.pages as unknown as string[][]
       const finalPage = pages[pages.length - 1].join('\n')
-      expect(finalPage).toContain('Generated privately on your device')
+      expect(finalPage).toContain('Generated locally in your browser')
       expect(finalPage).toMatch(/I acknowledge receipt|SEAL|Thank You/)
       expect(finalPage.length).toBeGreaterThan(500)
     })

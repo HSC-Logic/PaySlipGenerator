@@ -163,7 +163,7 @@ export function buildPdf(slip: PaymentSlip) {
 
   const pages = doc.getNumberOfPages()
   for (let page = 1; page <= pages; page += 1) {
-    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated privately on your device', marginX, pageHeight - 3); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, pageHeight - 3 - (referenceLines.length - 1) * bodyLine, { align: 'right' })
+    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated locally in your browser', marginX, pageHeight - 3); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, pageHeight - 3 - (referenceLines.length - 1) * bodyLine, { align: 'right' })
   }
   return doc
 }
