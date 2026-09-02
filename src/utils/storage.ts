@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   company: 'payment-slip-company',
   draft: 'payment-slip-draft',
   theme: 'payment-slip-theme',
+  recovery: 'payment-slip-recovery-v1',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -21,6 +22,10 @@ export const safeGet = (storage: Storage, key: string): string | null => {
 
 export const safeSet = (storage: Storage, key: string, value: string): boolean => {
   try { storage.setItem(key, value); return true } catch { return false }
+}
+
+export const safeRemove = (storage: Storage, key: string): boolean => {
+  try { storage.removeItem(key); return true } catch { return false }
 }
 
 const text = (value: unknown, fallback: string) => typeof value === 'string' ? value : fallback
@@ -55,8 +60,7 @@ const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
  * supplied defaults; unknown fields are ignored. Core sections and items must
  * still have the expected runtime shape before a draft is accepted.
  */
-export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip | null => {
-  const value = safeParse(safeGet(storage, STORAGE_KEYS.draft))
+const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
   if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment) || !Array.isArray(value.items)) return null
   const company = companyFrom(value.company, defaults.company)
   if (!company) return null
@@ -95,7 +99,23 @@ export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip 
   }
 }
 
+export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip | null => paymentSlipFrom(safeParse(safeGet(storage, STORAGE_KEYS.draft)), defaults)
+
 export const saveDraft = (storage: Storage, slip: PaymentSlip) => safeSet(storage, STORAGE_KEYS.draft, JSON.stringify(slip))
+
+export type RecoverySnapshot = { slip: PaymentSlip; baseline: PaymentSlip; savedAt: number }
+
+export const loadRecovery = (storage: Storage, defaults: PaymentSlip): RecoverySnapshot | null => {
+  const value = safeParse(safeGet(storage, STORAGE_KEYS.recovery))
+  if (!isRecord(value) || value.version !== 1 || typeof value.savedAt !== 'number' || !Number.isFinite(value.savedAt)) return null
+  const slip = paymentSlipFrom(value.slip, defaults)
+  const baseline = paymentSlipFrom(value.baseline, defaults)
+  return slip && baseline ? { slip, baseline, savedAt: value.savedAt } : null
+}
+
+export const saveRecovery = (storage: Storage, slip: PaymentSlip, baseline: PaymentSlip, savedAt = Date.now()) => safeSet(storage, STORAGE_KEYS.recovery, JSON.stringify({ version: 1, savedAt, slip, baseline }))
+
+export const clearRecovery = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.recovery)
 
 export const loadTheme = (storage: Storage): 'light' | 'dark' | null => {
   const value = safeGet(storage, STORAGE_KEYS.theme)

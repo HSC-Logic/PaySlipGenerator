@@ -12,34 +12,51 @@ import { buildPdf, downloadPdfDocument, printPdfDocument } from './utils/pdf'
 import { runDocumentAction } from './utils/documentActions'
 import { createSimilarSlip } from './utils/similarSlip'
 import { copySlip, prepareDestructiveReplacement } from './utils/dirtyState'
-import { loadCompany, loadDraft as loadStoredDraft, loadTheme, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveTheme } from './utils/storage'
+import { clearRecovery, loadCompany, loadDraft as loadStoredDraft, loadRecovery, loadTheme, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveTheme } from './utils/storage'
+import { loadMeaningfulRecovery, persistRecoveryState } from './utils/recovery'
 import { chooseFolder, connectDrive, createGoogleDoc, disconnectDrive, driveConfigured } from './services/googleDrive'
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const blank = (): PaymentSlip => ({ company: { name: '', address: '', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#0b1f3a' }, recipient: { name: '', identification: '', role: '', address: '', email: '', telephone: '' }, payment: { date: today(), reference: '', title: '', method: 'Cash', bankName: '', transactionReference: '', notes: '', adjustment: 0, currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' }, items: [{ id: crypto.randomUUID(), description: '', quantity: 1, rate: 0 }], adjustments: [] })
 type Notice = { kind: 'success' | 'error'; text: string } | null
-const persistedReferences = () => { const draft = loadStoredDraft(localStorage, blank()); return draft?.payment.reference ? [draft.payment.reference] : [] }
+const persistedReferences = () => { const defaults = blank(); const draft = loadStoredDraft(localStorage, defaults); const recovery = loadRecovery(localStorage, defaults); return [draft?.payment.reference, recovery?.slip.payment.reference].filter((value): value is string => Boolean(value)) }
+
+const initialPaymentState = () => {
+  const defaults = blank()
+  const initial = { ...defaults, company: loadCompany(localStorage, defaults.company) }
+  const recovery = loadMeaningfulRecovery(localStorage, initial)
+  return recovery
+    ? { slip: recovery.slip, baseline: recovery.baseline, recovered: true }
+    : { slip: initial, baseline: initial, recovered: false }
+}
 
 export default function App() {
-  const [slip, setSlip] = useState<PaymentSlip>(() => { const x = blank(); return { ...x, company: loadCompany(localStorage, x.company) } })
-  const cleanSlip = useRef<PaymentSlip>(copySlip(slip))
+  const [startup] = useState(initialPaymentState)
+  const [slip, setSlip] = useState<PaymentSlip>(startup.slip)
+  const cleanSlip = useRef<PaymentSlip>(copySlip(startup.baseline))
   const [darkMode, setDarkMode] = useState(() => { const saved = loadTheme(localStorage); return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches })
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const [activeStep, setActiveStep] = useState<WorkflowStep>('company'); const [highestStep, setHighestStep] = useState(0); const [attemptedStep, setAttemptedStep] = useState<WorkflowStep | null>(null)
-  const [attempted, setAttempted] = useState(false); const [notice, setNotice] = useState<Notice>(null); const [busy, setBusy] = useState('')
+  const [attempted, setAttempted] = useState(false); const [notice, setNotice] = useState<Notice>(startup.recovered ? { kind: 'success', text: 'Recovered your unsaved payment slip from this device.' } : null); const [busy, setBusy] = useState('')
   const [drive, setDrive] = useState<GoogleDriveState>({ connected: false, folderId: '', folderName: '', documentUrl: '' })
   const preview = useRef<HTMLDivElement>(null); const referenceInitialized = useRef(false); const allErrors = useMemo(() => validateSlip(slip), [slip]); const visibleErrors = attempted || attemptedStep === activeStep ? errorsForStep(allErrors, activeStep) : {}
   const valid = Object.keys(allErrors).length === 0; const total = finalTotal(slip.items, slip.payment.adjustment, slip.adjustments)
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(null), 4500); return () => clearTimeout(timer) }, [notice])
   useEffect(() => { const theme = darkMode ? 'dark' : 'light'; document.documentElement.dataset.theme = theme; saveTheme(localStorage, theme) }, [darkMode])
   useEffect(() => { if (referenceInitialized.current) return; referenceInitialized.current = true; setSlip(current => { if (current.payment.reference) return current; const next = { ...current, payment: { ...current.payment, reference: currentOrNextReference({ existingReferences: persistedReferences() }) } }; cleanSlip.current = copySlip(next); return next }) }, [])
+  useEffect(() => {
+    const persist = () => { persistRecoveryState(localStorage, slip, cleanSlip.current) }
+    const timer = window.setTimeout(persist, 750)
+    window.addEventListener('pagehide', persist)
+    return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', persist) }
+  }, [slip])
   const tell = (kind: 'success' | 'error', text: string) => setNotice({ kind, text })
   const focusError = (key: string) => requestAnimationFrame(() => { const control = document.querySelector<HTMLElement>(`[data-error-key="${CSS.escape(key)}"]`); control?.focus({ preventScroll: true }); control?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
   const requireValid = (action: () => void) => { setAttempted(true); if (!valid) { const first = Object.keys(allErrors)[0]; const targetStep: WorkflowStep = first.startsWith('company.') ? 'company' : first.startsWith('recipient.') ? 'recipient' : 'payment'; setHighestStep(value => Math.max(value, workflowSteps.findIndex(item => item.id === targetStep))); setActiveStep(targetStep); setAttemptedStep(targetStep); setMobileView('edit'); tell('error', 'Please fix the highlighted field before generating the slip.'); focusError(first); return } action() }
-  const saveDraft = () => { if (!saveStoredDraft(localStorage, slip)) return tell('error', 'The draft could not be saved on this device.'); cleanSlip.current = copySlip(slip); tell('success', 'Draft saved on this device.') }
-  const saveCompany = () => { if (!saveStoredCompany(localStorage, slip.company)) return tell('error', 'Company details could not be saved on this device.'); cleanSlip.current = { ...cleanSlip.current, company: { ...slip.company } }; tell('success', 'Company details saved on this device.') }
+  const saveDraft = () => { if (!saveStoredDraft(localStorage, slip)) return tell('error', 'The draft could not be saved on this device.'); cleanSlip.current = copySlip(slip); clearRecovery(localStorage); tell('success', 'Draft saved on this device.') }
+  const saveCompany = () => { if (!saveStoredCompany(localStorage, slip.company)) return tell('error', 'Company details could not be saved on this device.'); cleanSlip.current = { ...cleanSlip.current, company: { ...slip.company } }; persistRecoveryState(localStorage, slip, cleanSlip.current); tell('success', 'Company details saved on this device.') }
   const resetWorkflow = () => { setActiveStep('company'); setHighestStep(0); setAttemptedStep(null); setAttempted(false); setMobileView('edit') }
-  const acceptReplacement = (next: PaymentSlip) => { cleanSlip.current = copySlip(next); setSlip(next); resetWorkflow() }
+  const acceptReplacement = (next: PaymentSlip) => { clearRecovery(localStorage); cleanSlip.current = copySlip(next); setSlip(next); resetWorkflow() }
   const destructiveReplacement = (message: string, createReplacement: () => PaymentSlip) => prepareDestructiveReplacement({ current: slip, baseline: cleanSlip.current, confirmDiscard: () => confirm(message), createReplacement })
   const loadDraft = () => { const draft = loadStoredDraft(localStorage, blank()); if (!draft) return tell('error', 'No valid saved draft was found on this device.'); const next = destructiveReplacement('Load the saved draft? Unsaved changes to this slip will be lost.', () => draft); if (!next) return; acceptReplacement(next); tell('success', 'Draft loaded.') }
   const clear = () => { const next = destructiveReplacement('Clear this payment slip? Unsaved information will be lost.', () => { const cleared = blank(); cleared.company = copySlip(slip).company; cleared.payment.reference = slip.payment.reference || currentOrNextReference({ existingReferences: persistedReferences() }); return cleared }); if (!next) return; acceptReplacement(next); tell('success', 'Form cleared. Company details and payment reference were kept.') }
