@@ -1,10 +1,10 @@
 # Sliply — Payment Slip Generator
 
-A private, browser-based payment-slip workspace for creating professional A4 payment records. Sliply is built with React, TypeScript, and Vite and is designed for free hosting on GitHub Pages. PDF generation, printing, draft storage, and calculations work without a backend.
+A private, browser-based payment-slip workspace for creating professional payment records. Sliply is built with React, TypeScript, and Vite and is designed for free hosting on GitHub Pages. PDF generation, printing, draft storage, and calculations work without a backend.
 
 ## Features
 
-- Live A4 payment-slip preview with responsive desktop and mobile layouts
+- Live payment-slip preview with responsive desktop and mobile layouts
 - Guided Company → Recipient → Payment → Review workflow with preserved form state
 - Company, recipient, payment, line-item, adjustment, and signature details
 - Selectable LKR, USD, EUR, GBP, INR, AUD, CAD, and SGD formatting with currency-aware amount-in-words conversion
@@ -13,8 +13,8 @@ A private, browser-based payment-slip workspace for creating professional A4 pay
 - Persistent light and dark application themes with automatic first-use system preference
 - A4 (default), A5, B5, and Letter documents in portrait or landscape orientation
 - Fixed or percentage discounts, VAT/tax, service, delivery, and custom charges
-- Sharp, text-based A4 PDF export through jsPDF (not a screenshot)
-- Print stylesheet that prints only the payment slip
+- Sharp, text-based PDF export through jsPDF (not a screenshot)
+- Printing from the same generated PDF used by downloads
 - Browser-local saved company profile, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
 - Field-level validation, accessible labels, notices, and loading states
 - Optional, session-only Google Drive OAuth and Google Docs creation
@@ -39,6 +39,8 @@ npm test          # run utility tests
 npm run build     # TypeScript validation and production build
 npm run preview   # preview the production build
 ```
+
+PDF regression tests run as part of `npm test`. Before document-generation releases, complete the [manual PDF QA matrix](docs/pdf-manual-qa.md).
 
 For local development, set `VITE_BASE_PATH=/`. For a repository Pages site, use `/repository-name/`. A future custom domain should use `/`.
 
