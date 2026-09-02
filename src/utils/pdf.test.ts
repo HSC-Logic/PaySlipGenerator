@@ -76,4 +76,19 @@ describe('PDF generation', () => {
     expect(() => buildPdf(complete)).not.toThrow()
     expect(buildPdf(complete).output('arraybuffer').byteLength).toBeGreaterThan(4000)
   })
+
+  it.each(['portrait', 'landscape'] as const)('preserves representative long-form data in %s output', orientation => {
+    const consistency: PaymentSlip = {
+      ...sample,
+      company: { ...sample.company, name: 'Very Long Company Name COMPANY-END-MARKER', address: 'Address line one\nAddress line two\nAddress line three\nADDRESS-END-MARKER', registrationNumber: 'REGISTRATION-MARKER', authorizedName: 'AUTHORIZED-NAME-MARKER', authorizedDesignation: 'AUTHORIZED-DESIGNATION-MARKER' },
+      recipient: { name: 'Very Long Recipient Name RECIPIENT-END-MARKER', identification: 'NIC-MARKER', role: 'A very long professional role ROLE-END-MARKER', address: 'Recipient address RECIPIENT-ADDRESS-MARKER', email: 'recipient-marker@example.com', telephone: 'PHONE-MARKER' },
+      payment: { ...sample.payment, orientation, title: 'A very long payment purpose PURPOSE-END-MARKER', transactionReference: 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', notes: `${'Long payment note content. '.repeat(80)}NOTES-END-MARKER` },
+      items: Array.from({ length: 12 }, (_, index) => ({ id: String(index), description: `Long item ${index + 1} description ITEM-${index + 1}-END-MARKER`, quantity: index + 1, rate: 1250.5 })),
+      adjustments: Array.from({ length: 6 }, (_, index) => ({ id: String(index), label: `Adjustment ${index + 1} ADJUSTMENT-${index + 1}-MARKER`, kind: 'charge' as const, mode: 'fixed' as const, value: index + 1 })),
+    }
+    const pdf = buildPdf(consistency)
+    const output = pdf.output()
+    for (const marker of ['COMPANY-END-MARKER', 'ADDRESS-END-MARKER', 'REGISTRATION-MARKER', 'RECIPIENT-END-MARKER', 'NIC-MARKER', 'ROLE-END-MARKER', 'RECIPIENT-ADDRESS-MARKER', 'PHONE-MARKER', 'PURPOSE-END-MARKER', 'ITEM-12-END-MARKER', 'ADJUSTMENT-6-MARKER', 'NOTES-END-MARKER', 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', 'AUTHORIZED-NAME-MARKER', 'AUTHORIZED-DESIGNATION-MARKER']) expect(output).toContain(marker)
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(1)
+  })
 })
