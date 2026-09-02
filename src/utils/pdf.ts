@@ -70,7 +70,7 @@ export function buildPdf(slip: PaymentSlip) {
   const companyWidth = landscape ? contentWidth * 0.56 : contentWidth * 0.67
   const logoSize = compact ? 15 : 20
   let companyX = marginX
-  if (view.company.logo) { try { addContainedLogo(doc, view.company.logo, view.company.logoFormat, marginX, y, logoSize); companyX += logoSize + 6 } catch { /* preserve the text when a logo cannot be decoded */ } }
+  if (view.company.logo) { addContainedLogo(doc, view.company.logo, view.company.logoFormat, marginX, y, logoSize); companyX += logoSize + 6 }
   const companyTextWidth = companyWidth - (companyX - marginX)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 11 : 14); doc.setTextColor(...navy)
   const companyName = splitLines(doc, view.company.name, companyTextWidth); doc.text(companyName, companyX, y + 5)
@@ -172,21 +172,27 @@ export function createPdfBlob(slip: PaymentSlip) {
   return buildPdf(slip).output('blob')
 }
 
-export function generatePdf(slip: PaymentSlip) {
-  const url = URL.createObjectURL(createPdfBlob(slip))
+const pdfBlob = (doc: jsPDF) => doc.output('blob')
+
+export async function downloadPdfDocument(doc: jsPDF, slip: PaymentSlip) {
+  const url = URL.createObjectURL(pdfBlob(doc))
   const link = document.createElement('a')
-  link.href = url
-  link.download = pdfFilename(slip)
-  link.hidden = true
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+  try {
+    link.href = url
+    link.download = pdfFilename(slip)
+    link.hidden = true
+    document.body.appendChild(link)
+    link.click()
+    await new Promise<void>(resolve => window.setTimeout(resolve, 100))
+  } finally {
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
 }
 
-export function printPdf(slip: PaymentSlip) {
+export function printPdfDocument(doc: jsPDF) {
   return new Promise<void>((resolve, reject) => {
-    const url = URL.createObjectURL(createPdfBlob(slip))
+    const url = URL.createObjectURL(pdfBlob(doc))
     const frame = document.createElement('iframe')
     let cleaned = false
     let fallbackTimer = 0
@@ -229,7 +235,15 @@ export function printPdf(slip: PaymentSlip) {
       cleanup()
       reject(new Error('The printable PDF could not be loaded. Download it and print from your PDF viewer instead.'))
     }
-    frame.src = url
-    document.body.appendChild(frame)
+    try {
+      frame.src = url
+      document.body.appendChild(frame)
+    } catch (error) {
+      cleanup()
+      reject(error)
+    }
   })
 }
+
+export const generatePdf = async (slip: PaymentSlip) => downloadPdfDocument(buildPdf(slip), slip)
+export const printPdf = (slip: PaymentSlip) => printPdfDocument(buildPdf(slip))

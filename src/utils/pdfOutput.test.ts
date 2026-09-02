@@ -21,17 +21,18 @@ describe('PDF output actions', () => {
     document.body.replaceChildren()
   })
 
-  it('downloads the shared PDF blob and revokes its object URL', () => {
+  it('downloads the shared PDF blob and revokes its object URL', async () => {
     const slip = createBasicSlip()
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
-    generatePdf(slip)
+    const pending = generatePdf(slip)
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
     expect(blob.type).toBe('application/pdf')
     expect(blob.size).toBeGreaterThan(3000)
     expect(click).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(100)
+    await pending
     expect(document.querySelector('a[download]')).toBeNull()
-    vi.advanceTimersByTime(1_000)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:payment-slip')
   })
 

@@ -70,7 +70,7 @@ describe('PDF document generation', () => {
 
     it('accepts a logo without preventing document creation', () => {
       const slip = createBasicSlip()
-      slip.company.logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M/wHwAF/gL+W9eWAAAAAElFTkSuQmCC'
+      slip.company.logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
       expect(() => buildPdf(slip)).not.toThrow()
     })
   })
