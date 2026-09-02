@@ -10,8 +10,12 @@ export type PdfPageMetrics = {
   marginX: number
   marginTop: number
   marginBottom: number
+  footerHeight: number
+  contentTop: number
+  contentBottom: number
   contentWidth: number
   contentHeight: number
+  compact: boolean
   orientation: 'portrait' | 'landscape'
 }
 
@@ -26,11 +30,16 @@ export function getPdfPageMetrics(doc: jsPDF, orientation: PdfPageMetrics['orien
   const marginX = Math.max(12, Math.min(18, pageWidth * 0.06))
   const marginTop = Math.max(9, Math.min(12, pageHeight * 0.055))
   const marginBottom = Math.max(10, Math.min(14, pageHeight * 0.065))
-  return { pageWidth, pageHeight, marginX, marginTop, marginBottom, contentWidth: pageWidth - marginX * 2, contentHeight: pageHeight - marginTop - marginBottom, orientation }
+  const compact = pageHeight < 180
+  const footerHeight = compact ? 7 : 9
+  const contentTop = marginTop
+  const contentBottom = pageHeight - footerHeight - marginBottom
+  return { pageWidth, pageHeight, marginX, marginTop, marginBottom, footerHeight, contentTop, contentBottom, contentWidth: pageWidth - marginX * 2, contentHeight: contentBottom - contentTop, compact, orientation }
 }
 
 const splitLines = (doc: jsPDF, value: string, width: number) => value.split(/\r?\n/).flatMap(line => line ? doc.splitTextToSize(line, width) as string[] : [''])
 const lineBlockHeight = (lines: string[], lineHeight: number) => Math.max(1, lines.length) * lineHeight
+export const getPdfTableColumnWidths = (contentWidth: number) => [contentWidth * 0.05, contentWidth * 0.5, contentWidth * 0.09, contentWidth * 0.17, contentWidth * 0.19]
 
 export function buildPdf(slip: PaymentSlip) {
   const view = buildPaymentSlipView(slip)
@@ -39,9 +48,7 @@ export function buildPdf(slip: PaymentSlip) {
   const layout = getPdfPageMetrics(doc, orientation)
   const { pageWidth, pageHeight, marginX, contentWidth } = layout
   const landscape = orientation === 'landscape'
-  const compact = pageHeight < 180
-  const footerHeight = compact ? 7 : 9
-  const contentBottom = pageHeight - footerHeight - layout.marginBottom
+  const { compact, footerHeight, contentBottom } = layout
   const navy: [number, number, number] = hexToRgb(view.themeColor)
   const muted: [number, number, number] = [91, 105, 124]
   const bodySize = compact ? 6.4 : 8
@@ -101,7 +108,7 @@ export function buildPdf(slip: PaymentSlip) {
   y = ensureSpace(y, purposeHeight, 'PAYMENT DETAILS')
   doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentWidth, purposeHeight, 2, 2, 'F'); drawLabel('PAYMENT FOR', marginX + 5, y + (compact ? 4 : 5)); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(purposeLines, marginX + 5, y + (compact ? 8 : 10)); y += purposeHeight + sectionGap
 
-  const tableWidths = [contentWidth * 0.05, contentWidth * 0.5, contentWidth * 0.09, contentWidth * 0.17, contentWidth * 0.19]
+  const tableWidths = getPdfTableColumnWidths(contentWidth)
   autoTable(doc, { startY: y, margin: { left: marginX, right: marginX, bottom: pageHeight - contentBottom, top: layout.marginTop + 10 }, showHead: 'everyPage', rowPageBreak: 'avoid', head: [['#', 'Description', 'Qty', 'Rate', 'Amount']], body: view.items.map(item => [item.index, item.description, item.quantity, item.rate, item.amount]), theme: 'plain', headStyles: { fillColor: navy, textColor: 255, fontSize: compact ? 6.2 : 8, cellPadding: compact ? 1.6 : 3 }, bodyStyles: { textColor: [45, 55, 68], fontSize: compact ? 6.2 : 8.5, cellPadding: compact ? 1.5 : 3, lineColor: [226, 230, 235], lineWidth: { bottom: .15 } }, columnStyles: { 0: { cellWidth: tableWidths[0] }, 1: { cellWidth: tableWidths[1] }, 2: { halign: 'right', cellWidth: tableWidths[2] }, 3: { halign: 'right', cellWidth: tableWidths[3] }, 4: { halign: 'right', cellWidth: tableWidths[4] } } })
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + sectionGap
 

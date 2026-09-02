@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PaymentSlip } from '../types'
-import { buildPdf, createPdfBlob, getPdfPageMetrics, pdfFilename } from './pdf'
+import { buildPdf, createPdfBlob, getPdfPageMetrics, getPdfTableColumnWidths, pdfFilename } from './pdf'
 
 const sample: PaymentSlip = {
   company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#123456' },
@@ -45,9 +45,11 @@ describe('PDF generation', () => {
     expect(metrics.marginTop).toBeGreaterThan(0)
     expect(metrics.marginBottom).toBeGreaterThan(0)
     expect(metrics.marginX + metrics.contentWidth).toBeLessThanOrEqual(metrics.pageWidth)
-    expect(metrics.marginTop + metrics.contentHeight + metrics.marginBottom).toBeCloseTo(metrics.pageHeight, 5)
+    expect(metrics.contentTop + metrics.contentHeight).toBeCloseTo(metrics.contentBottom, 5)
+    expect(metrics.contentBottom + metrics.marginBottom + metrics.footerHeight).toBeCloseTo(metrics.pageHeight, 5)
     expect(metrics.contentWidth).toBeGreaterThan(0)
     expect(metrics.contentHeight).toBeGreaterThan(0)
+    expect(getPdfTableColumnWidths(metrics.contentWidth).reduce((sum, width) => sum + width, 0)).toBeCloseTo(metrics.contentWidth, 5)
   })
 
   it('paginates many long line items and tolerates large totals and missing optional data', () => {
@@ -77,18 +79,23 @@ describe('PDF generation', () => {
     expect(buildPdf(complete).output('arraybuffer').byteLength).toBeGreaterThan(4000)
   })
 
-  it.each(['portrait', 'landscape'] as const)('preserves representative long-form data in %s output', orientation => {
+  it.each([
+    ['a4', 'portrait'], ['a4', 'landscape'],
+    ['a5', 'portrait'], ['a5', 'landscape'],
+    ['b5', 'portrait'], ['b5', 'landscape'],
+    ['letter', 'portrait'], ['letter', 'landscape'],
+  ] as const)('preserves the same representative dataset in %s %s output', (paperSize, orientation) => {
     const consistency: PaymentSlip = {
       ...sample,
-      company: { ...sample.company, name: 'Very Long Company Name COMPANY-END-MARKER', address: 'Address line one\nAddress line two\nAddress line three\nADDRESS-END-MARKER', registrationNumber: 'REGISTRATION-MARKER', authorizedName: 'AUTHORIZED-NAME-MARKER', authorizedDesignation: 'AUTHORIZED-DESIGNATION-MARKER' },
+      company: { ...sample.company, name: 'Very Long Company Name COMPANY-END-MARKER', address: 'Address line one\nAddress line two\nAddress line three\nADDRESS-END-MARKER', registrationNumber: 'REGISTRATION-MARKER', authorizedName: 'Very Long Authorized Person Name AUTHNAMEMARKER', authorizedDesignation: 'Very Long Authorized Professional Designation AUTHROLEMARKER' },
       recipient: { name: 'Very Long Recipient Name RECIPIENT-END-MARKER', identification: 'NIC-MARKER', role: 'A very long professional role ROLE-END-MARKER', address: 'Recipient address RECIPIENT-ADDRESS-MARKER', email: 'recipient-marker@example.com', telephone: 'PHONE-MARKER' },
-      payment: { ...sample.payment, orientation, title: 'A very long payment purpose PURPOSE-END-MARKER', transactionReference: 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', notes: `${'Long payment note content. '.repeat(80)}NOTES-END-MARKER` },
+      payment: { ...sample.payment, paperSize, orientation, title: 'A very long payment purpose PURPOSE-END-MARKER', transactionReference: 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', notes: `${'Long payment note content. '.repeat(80)}NOTES-END-MARKER` },
       items: Array.from({ length: 12 }, (_, index) => ({ id: String(index), description: `Long item ${index + 1} description ITEM-${index + 1}-END-MARKER`, quantity: index + 1, rate: 1250.5 })),
-      adjustments: Array.from({ length: 6 }, (_, index) => ({ id: String(index), label: `Adjustment ${index + 1} ADJUSTMENT-${index + 1}-MARKER`, kind: 'charge' as const, mode: 'fixed' as const, value: index + 1 })),
+      adjustments: Array.from({ length: 6 }, (_, index) => ({ id: String(index), label: `A deliberately long adjustment label ${index + 1} ADJ${index + 1}MARKER`, kind: 'charge' as const, mode: 'fixed' as const, value: index + 1 })),
     }
     const pdf = buildPdf(consistency)
     const output = pdf.output()
-    for (const marker of ['COMPANY-END-MARKER', 'ADDRESS-END-MARKER', 'REGISTRATION-MARKER', 'RECIPIENT-END-MARKER', 'NIC-MARKER', 'ROLE-END-MARKER', 'RECIPIENT-ADDRESS-MARKER', 'PHONE-MARKER', 'PURPOSE-END-MARKER', 'ITEM-12-END-MARKER', 'ADJUSTMENT-6-MARKER', 'NOTES-END-MARKER', 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', 'AUTHORIZED-NAME-MARKER', 'AUTHORIZED-DESIGNATION-MARKER']) expect(output).toContain(marker)
+    for (const marker of ['COMPANY-END-MARKER', 'ADDRESS-END-MARKER', 'REGISTRATION-MARKER', 'RECIPIENT-END-MARKER', 'NIC-MARKER', 'ROLE-END-MARKER', 'RECIPIENT-ADDRESS-MARKER', 'PHONE-MARKER', 'PURPOSE-END-MARKER', 'ITEM-12-END-MARKER', 'ADJ6MARKER', 'NOTES-END-MARKER', 'A-LONG-TRANSACTION-REFERENCE-END-MARKER', 'AUTHNAMEMARKER', 'AUTHROLEMARKER']) expect(output).toContain(marker)
     expect(pdf.getNumberOfPages()).toBeGreaterThan(1)
   })
 })
