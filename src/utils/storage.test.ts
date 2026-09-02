@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { loadCompany, loadDraft, loadTheme, safeParse, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
+import { loadCompany, loadDraft, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -76,13 +76,36 @@ describe('safe persisted data loading', () => {
   it('round-trips company, draft, and theme through their storage APIs', () => {
     const storage = new MemoryStorage()
     const slip = createBasicSlip()
-    expect(saveCompany(storage, slip.company)).toBe(true)
-    expect(saveDraft(storage, slip)).toBe(true)
-    expect(saveTheme(storage, 'dark')).toBe(true)
+    expect(saveCompany(storage, slip.company).success).toBe(true)
+    expect(saveDraft(storage, slip).success).toBe(true)
+    expect(saveTheme(storage, 'dark').success).toBe(true)
     expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('dark')
     storage.setItem(STORAGE_KEYS.theme, 'unknown')
     expect(loadTheme(storage)).toBeNull()
+  })
+
+  it.each([
+    ['QuotaExceededError', 'quota-exceeded', 'storage is full'],
+    ['SecurityError', 'access-denied', 'blocked local storage'],
+    ['UnexpectedError', 'unknown', 'current form remains open'],
+  ] as const)('classifies %s writes without throwing or reporting success', (name, reason, message) => {
+    const storage = new MemoryStorage()
+    storage.setItem = () => { throw name === 'UnexpectedError' ? Object.assign(new Error('failed'), { name }) : new DOMException('failed', name) }
+    const slip = createBasicSlip()
+    const before = structuredClone(slip)
+    const result = saveDraft(storage, slip)
+    expect(result).toMatchObject({ success: false, reason, errorName: name })
+    expect(persistenceMessage(result, 'The draft')).toContain(message)
+    expect(slip).toEqual(before)
+  })
+
+  it('returns the same failure contract for centralized set and remove operations', () => {
+    const storage = new MemoryStorage()
+    storage.setItem = () => { throw new DOMException('denied', 'SecurityError') }
+    storage.removeItem = () => { throw new Error('remove failed') }
+    expect(safeSet(storage, 'key', 'value')).toMatchObject({ success: false, reason: 'access-denied' })
+    expect(safeRemove(storage, 'key')).toMatchObject({ success: false, reason: 'unknown' })
   })
 })

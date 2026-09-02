@@ -90,7 +90,7 @@ The application lists folders that the granted `drive.file` scope makes availabl
 - Data leaves the device only when the user explicitly creates a Google Doc.
 - OAuth access tokens are held in memory for the current page session only.
 - Local browser data is not encrypted; avoid using a shared browser profile for sensitive records and clear site data when appropriate.
-- Uploaded logos are limited to image files smaller than 2 MB.
+- Uploaded logos are limited to image files smaller than 2 MB. Logos are stored as Base64 data, which adds roughly one-third to the source file size; because a logo may also be present in the company profile, explicit draft, and recovery snapshots, large logos can approach browser storage quotas. The application reports quota failures without changing image quality or discarding the in-memory form.
 
 ### Payment reference persistence
 

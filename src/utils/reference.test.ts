@@ -24,4 +24,13 @@ describe('payment references', () => {
     expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001')
     expect(reserveNextReference({ year: 2025, storage })).toBe('PS-2025-0005')
   })
+  it('surfaces reference storage failures while preserving the generated in-memory reference', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    storage.setItem = () => { throw new DOMException('full', 'QuotaExceededError') }
+    session.setItem = () => { throw new DOMException('denied', 'SecurityError') }
+    const failures: string[] = []
+    expect(generateReference({ year: 2026, storage, session, onPersistenceFailure: result => { if (!result.success) failures.push(result.reason) } })).toBe('PS-2026-0001')
+    expect(failures).toEqual(['quota-exceeded', 'access-denied'])
+  })
 })

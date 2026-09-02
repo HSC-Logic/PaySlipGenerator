@@ -21,7 +21,7 @@ describe('crash and refresh recovery lifecycle', () => {
     const edited = copySlip(baseline)
     edited.payment.notes = 'Work recovered after restart'
     edited.payment.reference = 'PS-2026-0042'
-    expect(persistRecoveryState(storage, edited, baseline)).toBe(true)
+    expect(persistRecoveryState(storage, edited, baseline).success).toBe(true)
 
     const restarted = loadMeaningfulRecovery(storage, createBasicSlip())
     expect(restarted?.slip).toEqual(edited)
@@ -34,7 +34,7 @@ describe('crash and refresh recovery lifecycle', () => {
     const blank = createBasicSlip()
     saveRecovery(storage, blank, copySlip(blank), 1)
     expect(loadMeaningfulRecovery(storage, blank)).toBeNull()
-    expect(persistRecoveryState(storage, blank, copySlip(blank))).toBe(true)
+    expect(persistRecoveryState(storage, blank, copySlip(blank)).success).toBe(true)
     expect(safeGet(storage, STORAGE_KEYS.recovery)).toBeNull()
   })
 
@@ -56,7 +56,7 @@ describe('crash and refresh recovery lifecycle', () => {
     const edited = copySlip(draft); edited.payment.title = 'Unsaved purpose'
     saveDraft(storage, draft)
     persistRecoveryState(storage, edited, draft)
-    expect(clearRecovery(storage)).toBe(true)
+    expect(clearRecovery(storage).success).toBe(true)
     expect(loadRecovery(storage, createBasicSlip())).toBeNull()
     expect(loadDraft(storage, createBasicSlip())).toEqual(draft)
   })

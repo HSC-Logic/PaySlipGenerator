@@ -20,12 +20,28 @@ export const safeGet = (storage: Storage, key: string): string | null => {
   try { return storage.getItem(key) } catch { return null }
 }
 
-export const safeSet = (storage: Storage, key: string, value: string): boolean => {
-  try { storage.setItem(key, value); return true } catch { return false }
+export type PersistenceFailureReason = 'quota-exceeded' | 'access-denied' | 'unknown'
+export type PersistenceResult = { success: true } | { success: false; reason: PersistenceFailureReason; errorName: string }
+
+const persistenceFailure = (error: unknown): PersistenceResult => {
+  const errorName = error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException) ? error.name : 'UnknownError'
+  const reason = errorName === 'QuotaExceededError' ? 'quota-exceeded' : errorName === 'SecurityError' ? 'access-denied' : 'unknown'
+  return { success: false, reason, errorName }
 }
 
-export const safeRemove = (storage: Storage, key: string): boolean => {
-  try { storage.removeItem(key); return true } catch { return false }
+export const safeSet = (storage: Storage, key: string, value: string): PersistenceResult => {
+  try { storage.setItem(key, value); return { success: true } } catch (error) { return persistenceFailure(error) }
+}
+
+export const safeRemove = (storage: Storage, key: string): PersistenceResult => {
+  try { storage.removeItem(key); return { success: true } } catch (error) { return persistenceFailure(error) }
+}
+
+export const persistenceMessage = (result: PersistenceResult, subject: string) => {
+  if (result.success) return ''
+  if (result.reason === 'quota-exceeded') return `${subject} could not be saved because browser storage is full. A large logo can use significant space; remove or reduce it and try again.`
+  if (result.reason === 'access-denied') return `${subject} could not be saved because this browser blocked local storage. Check privacy or site-storage settings and try again.`
+  return `${subject} could not be saved on this device. Your current form remains open; try again before leaving this page.`
 }
 
 const text = (value: unknown, fallback: string) => typeof value === 'string' ? value : fallback

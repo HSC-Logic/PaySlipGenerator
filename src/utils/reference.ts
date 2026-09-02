@@ -1,9 +1,11 @@
+import { isRecord, safeGet, safeParse, safeSet, type PersistenceResult } from './storage'
+
 const STATE_KEY = 'payment-slip-reference-state-v1'
 const ACTIVE_KEY = 'payment-slip-active-reference'
 const legacySequenceKey = (year: number) => `payment-slip-sequence-${year}`
 
 type ReferenceState = { version: 1; years: Record<string, { last: number; issued: string[] }> }
-type ReferenceOptions = { year?: number; storage?: Storage; session?: Storage; existingReferences?: string[] }
+type ReferenceOptions = { year?: number; storage?: Storage; session?: Storage; existingReferences?: string[]; onPersistenceFailure?: (result: PersistenceResult) => void }
 
 export const nextReference = (year: number, sequence: number) => `PS-${year}-${String(sequence).padStart(4, '0')}`
 
@@ -25,7 +27,8 @@ const readState = (storage: Storage): ReferenceState => {
   return { version: 1, years: {} }
 }
 
-export const reserveNextReference = ({ year = new Date().getFullYear(), storage = localStorage, existingReferences = [] }: ReferenceOptions = {}) => {
+export const reserveNextReference = (options: ReferenceOptions = {}) => {
+  const { year = new Date().getFullYear(), storage = localStorage, existingReferences = [] } = options
   const state = readState(storage)
   const record = state.years[String(year)] || { last: 0, issued: [] }
   const known = new Set([...record.issued, ...existingReferences].map(value => value.trim()).filter(Boolean))
@@ -35,7 +38,8 @@ export const reserveNextReference = ({ year = new Date().getFullYear(), storage 
   let reference = nextReference(year, sequence)
   while (known.has(reference)) { sequence += 1; reference = nextReference(year, sequence) }
   state.years[String(year)] = { last: sequence, issued: [...new Set([...record.issued, reference])] }
-  safeSet(storage, STATE_KEY, JSON.stringify(state))
+  const persisted = safeSet(storage, STATE_KEY, JSON.stringify(state))
+  if (!persisted.success) options.onPersistenceFailure?.(persisted)
   return reference
 }
 
@@ -45,7 +49,8 @@ export const currentOrNextReference = (options: ReferenceOptions = {}) => {
   const active = safeGet(session, ACTIVE_KEY) || ''
   if (parseReference(active)?.year === year) return active
   const reference = reserveNextReference({ ...options, year })
-  safeSet(session, ACTIVE_KEY, reference)
+  const persisted = safeSet(session, ACTIVE_KEY, reference)
+  if (!persisted.success) options.onPersistenceFailure?.(persisted)
   return reference
 }
 
@@ -53,9 +58,9 @@ export const startNewReference = (options: ReferenceOptions = {}) => {
   const year = options.year ?? new Date().getFullYear()
   const session = options.session ?? sessionStorage
   const reference = reserveNextReference({ ...options, year })
-  safeSet(session, ACTIVE_KEY, reference)
+  const persisted = safeSet(session, ACTIVE_KEY, reference)
+  if (!persisted.success) options.onPersistenceFailure?.(persisted)
   return reference
 }
 
 export const generateReference = (options: ReferenceOptions = {}) => startNewReference(options)
-import { isRecord, safeGet, safeParse, safeSet } from './storage'
