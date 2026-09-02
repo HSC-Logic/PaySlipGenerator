@@ -67,5 +67,16 @@ describe('crash and refresh recovery lifecycle', () => {
     expect(loadMeaningfulRecovery(storage, createBasicSlip())).toBeNull()
     storage.setItem(STORAGE_KEYS.recovery, JSON.stringify({ version: 1, savedAt: 1, slip: [], baseline: {} }))
     expect(loadMeaningfulRecovery(storage, createBasicSlip())).toBeNull()
+    storage.setItem(STORAGE_KEYS.recovery, JSON.stringify({ version: 99, savedAt: 1, slip: createBasicSlip(), baseline: createBasicSlip() }))
+    expect(loadMeaningfulRecovery(storage, createBasicSlip())).toBeNull()
+  })
+
+  it('does not overwrite unknown recovery versions during blank startup cleanup', () => {
+    const storage = new MemoryStorage()
+    const future = JSON.stringify({ version: 99, data: { future: true } })
+    storage.setItem(STORAGE_KEYS.recovery, future)
+    const blank = createBasicSlip()
+    expect(persistRecoveryState(storage, blank, copySlip(blank)).success).toBe(true)
+    expect(storage.getItem(STORAGE_KEYS.recovery)).toBe(future)
   })
 })

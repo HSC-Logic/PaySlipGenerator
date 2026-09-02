@@ -24,6 +24,14 @@ describe('payment references', () => {
     expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001')
     expect(reserveNextReference({ year: 2025, storage })).toBe('PS-2025-0005')
   })
+  it('rejects unknown reference-state versions and retains the legacy scalar counter migration', () => {
+    const storage = new MemoryStorage()
+    const futureState = JSON.stringify({ version: 99, years: { 2026: { last: 500, issued: [] } } })
+    storage.setItem('payment-slip-reference-state-v1', futureState)
+    storage.setItem('payment-slip-sequence-2026', '7')
+    expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0008')
+    expect(storage.getItem('payment-slip-reference-state-v1')).toBe(futureState)
+  })
   it('surfaces reference storage failures while preserving the generated in-memory reference', () => {
     const storage = new MemoryStorage()
     const session = new MemoryStorage()

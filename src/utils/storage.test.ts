@@ -28,6 +28,53 @@ describe('safe persisted data loading', () => {
     expect(loadDraft(storage, createBasicSlip())).toEqual(createBasicSlip())
   })
 
+  it('writes and loads current v1 envelopes for company, draft, and theme', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    saveCompany(storage, slip.company)
+    saveDraft(storage, slip)
+    saveTheme(storage, 'dark')
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.company)!)).toEqual({ version: 1, data: slip.company })
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.draft)!)).toEqual({ version: 1, data: slip })
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.theme)!)).toEqual({ version: 1, data: 'dark' })
+    expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
+    expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
+    expect(loadTheme(storage)).toBe('dark')
+  })
+
+  it('migrates legacy unversioned company, draft, and theme values in memory', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    storage.setItem(STORAGE_KEYS.company, JSON.stringify(slip.company))
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify(slip))
+    storage.setItem(STORAGE_KEYS.theme, 'light')
+    expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
+    expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
+    expect(loadTheme(storage)).toBe('light')
+  })
+
+  it('rejects unknown persistence versions without treating envelope data as legacy', () => {
+    const storage = new MemoryStorage()
+    const fallback = createBasicSlip()
+    storage.setItem(STORAGE_KEYS.company, JSON.stringify({ version: 99, data: { name: 'Do not load' } }))
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ version: 99, data: fallback }))
+    storage.setItem(STORAGE_KEYS.theme, JSON.stringify({ version: 99, data: 'dark' }))
+    expect(loadCompany(storage, fallback.company)).toEqual(fallback.company)
+    expect(loadDraft(storage, fallback)).toBeNull()
+    expect(loadTheme(storage)).toBeNull()
+  })
+
+  it('falls back safely when a current-version payload cannot be migrated or validated', () => {
+    const storage = new MemoryStorage()
+    const fallback = createBasicSlip()
+    storage.setItem(STORAGE_KEYS.company, JSON.stringify({ version: 1, data: [] }))
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ version: 1, data: { company: {}, recipient: {}, payment: {}, items: null } }))
+    storage.setItem(STORAGE_KEYS.theme, JSON.stringify({ version: 1, data: 42 }))
+    expect(loadCompany(storage, fallback.company)).toEqual(fallback.company)
+    expect(loadDraft(storage, fallback)).toBeNull()
+    expect(loadTheme(storage)).toBeNull()
+  })
+
   it.each([
     ['an array', []],
     ['an object missing items', { company: {}, recipient: {}, payment: {} }],

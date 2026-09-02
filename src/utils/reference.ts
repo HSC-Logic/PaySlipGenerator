@@ -14,7 +14,7 @@ export const parseReference = (reference: string) => {
   return match ? { year: Number(match[1]), sequence: Number(match[2]) } : null
 }
 
-const readState = (storage: Storage): ReferenceState => {
+const readState = (storage: Storage): { state: ReferenceState; writable: boolean } => {
   const parsed = safeParse(safeGet(storage, STATE_KEY))
   if (isRecord(parsed) && parsed.version === 1 && isRecord(parsed.years)) {
     const years: ReferenceState['years'] = {}
@@ -22,14 +22,15 @@ const readState = (storage: Storage): ReferenceState => {
       if (!/^\d{4}$/.test(year) || !isRecord(value) || typeof value.last !== 'number' || !Number.isFinite(value.last) || !Array.isArray(value.issued) || !value.issued.every(item => typeof item === 'string')) continue
       years[year] = { last: Math.max(0, Math.floor(value.last)), issued: value.issued }
     }
-    return { version: 1, years }
+    return { state: { version: 1, years }, writable: true }
   }
-  return { version: 1, years: {} }
+  const unknownVersion = isRecord(parsed) && Object.hasOwn(parsed, 'version') && parsed.version !== 1
+  return { state: { version: 1, years: {} }, writable: !unknownVersion }
 }
 
 export const reserveNextReference = (options: ReferenceOptions = {}) => {
   const { year = new Date().getFullYear(), storage = localStorage, existingReferences = [] } = options
-  const state = readState(storage)
+  const { state, writable } = readState(storage)
   const record = state.years[String(year)] || { last: 0, issued: [] }
   const known = new Set([...record.issued, ...existingReferences].map(value => value.trim()).filter(Boolean))
   const knownSequences = [...known].map(parseReference).filter(value => value?.year === year).map(value => value!.sequence)
@@ -38,8 +39,10 @@ export const reserveNextReference = (options: ReferenceOptions = {}) => {
   let reference = nextReference(year, sequence)
   while (known.has(reference)) { sequence += 1; reference = nextReference(year, sequence) }
   state.years[String(year)] = { last: sequence, issued: [...new Set([...record.issued, reference])] }
-  const persisted = safeSet(storage, STATE_KEY, JSON.stringify(state))
-  if (!persisted.success) options.onPersistenceFailure?.(persisted)
+  if (writable) {
+    const persisted = safeSet(storage, STATE_KEY, JSON.stringify(state))
+    if (!persisted.success) options.onPersistenceFailure?.(persisted)
+  }
   return reference
 }
 

@@ -47,6 +47,13 @@ export const persistenceMessage = (result: PersistenceResult, subject: string) =
 const text = (value: unknown, fallback: string) => typeof value === 'string' ? value : fallback
 const numeric = (value: unknown, fallback: number | ''): number | '' => value === '' || (typeof value === 'number' && Number.isFinite(value)) ? value : fallback
 const oneOf = <T extends string>(value: unknown, values: readonly T[], fallback: T): T => typeof value === 'string' && values.includes(value as T) ? value as T : fallback
+const VERSION = 1 as const
+const envelope = <T>(data: T) => ({ version: VERSION, data })
+const invalidVersion = Symbol('invalid-persistence-version')
+const unwrapCurrentOrLegacy = (value: unknown): unknown | typeof invalidVersion => {
+  if (!isRecord(value) || !Object.hasOwn(value, 'version')) return value
+  return value.version === VERSION && Object.hasOwn(value, 'data') ? value.data : invalidVersion
+}
 
 const companyFrom = (value: unknown, fallback: Company): Company | null => {
   if (!isRecord(value)) return null
@@ -58,9 +65,12 @@ const companyFrom = (value: unknown, fallback: Company): Company | null => {
   }
 }
 
-export const loadCompany = (storage: Storage, fallback: Company): Company => companyFrom(safeParse(safeGet(storage, STORAGE_KEYS.company)), fallback) ?? { ...fallback }
+export const loadCompany = (storage: Storage, fallback: Company): Company => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.company)))
+  return value === invalidVersion ? { ...fallback } : companyFrom(value, fallback) ?? { ...fallback }
+}
 
-export const saveCompany = (storage: Storage, company: Company) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(company))
+export const saveCompany = (storage: Storage, company: Company) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
 
 const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.label !== 'string') return null
@@ -115,9 +125,12 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
   }
 }
 
-export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip | null => paymentSlipFrom(safeParse(safeGet(storage, STORAGE_KEYS.draft)), defaults)
+export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip | null => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.draft)))
+  return value === invalidVersion ? null : paymentSlipFrom(value, defaults)
+}
 
-export const saveDraft = (storage: Storage, slip: PaymentSlip) => safeSet(storage, STORAGE_KEYS.draft, JSON.stringify(slip))
+export const saveDraft = (storage: Storage, slip: PaymentSlip) => safeSet(storage, STORAGE_KEYS.draft, JSON.stringify(envelope(slip)))
 
 export type RecoverySnapshot = { slip: PaymentSlip; baseline: PaymentSlip; savedAt: number }
 
@@ -131,11 +144,19 @@ export const loadRecovery = (storage: Storage, defaults: PaymentSlip): RecoveryS
 
 export const saveRecovery = (storage: Storage, slip: PaymentSlip, baseline: PaymentSlip, savedAt = Date.now()) => safeSet(storage, STORAGE_KEYS.recovery, JSON.stringify({ version: 1, savedAt, slip, baseline }))
 
-export const clearRecovery = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.recovery)
+export const clearRecovery = (storage: Storage, preserveUnknown = false) => {
+  if (preserveUnknown) {
+    const value = safeParse(safeGet(storage, STORAGE_KEYS.recovery))
+    if (value !== null && (!isRecord(value) || value.version !== 1 || typeof value.savedAt !== 'number')) return { success: true } as PersistenceResult
+  }
+  return safeRemove(storage, STORAGE_KEYS.recovery)
+}
 
 export const loadTheme = (storage: Storage): 'light' | 'dark' | null => {
-  const value = safeGet(storage, STORAGE_KEYS.theme)
+  const raw = safeGet(storage, STORAGE_KEYS.theme)
+  const parsed = safeParse(raw)
+  const value = parsed === null && (raw === 'light' || raw === 'dark') ? raw : unwrapCurrentOrLegacy(parsed)
   return value === 'light' || value === 'dark' ? value : null
 }
 
-export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => safeSet(storage, STORAGE_KEYS.theme, theme)
+export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => safeSet(storage, STORAGE_KEYS.theme, JSON.stringify(envelope(theme)))

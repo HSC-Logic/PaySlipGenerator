@@ -9,4 +9,4 @@ export const loadMeaningfulRecovery = (storage: Storage, defaults: PaymentSlip):
 
 export const persistRecoveryState = (storage: Storage, slip: PaymentSlip, baseline: PaymentSlip) => hasUnsavedChanges(slip, baseline)
   ? saveRecovery(storage, slip, baseline)
-  : clearRecovery(storage)
+  : clearRecovery(storage, true)
