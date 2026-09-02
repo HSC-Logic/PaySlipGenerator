@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PaymentSlip } from '../types'
-import { buildPdf, createPdfBlob, pdfFilename } from './pdf'
+import { buildPdf, createPdfBlob, getPdfPageMetrics, pdfFilename } from './pdf'
 
 const sample: PaymentSlip = {
   company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#123456' },
@@ -33,6 +33,21 @@ describe('PDF generation', () => {
     const pdf = buildPdf({ ...sample, payment: { ...sample.payment, paperSize, orientation } })
     expect(pdf.internal.pageSize.getWidth()).toBeCloseTo(width, 0)
     expect(pdf.internal.pageSize.getHeight()).toBeCloseTo(height, 0)
+  })
+
+  it.each([
+    ['a4', 'portrait'], ['a4', 'landscape'], ['a5', 'portrait'], ['a5', 'landscape'],
+    ['b5', 'portrait'], ['b5', 'landscape'], ['letter', 'portrait'], ['letter', 'landscape'],
+  ] as const)('keeps %s %s page metrics within the physical page', (paperSize, orientation) => {
+    const pdf = buildPdf({ ...sample, payment: { ...sample.payment, paperSize, orientation } })
+    const metrics = getPdfPageMetrics(pdf, orientation)
+    expect(metrics.marginX).toBeGreaterThan(0)
+    expect(metrics.marginTop).toBeGreaterThan(0)
+    expect(metrics.marginBottom).toBeGreaterThan(0)
+    expect(metrics.marginX + metrics.contentWidth).toBeLessThanOrEqual(metrics.pageWidth)
+    expect(metrics.marginTop + metrics.contentHeight + metrics.marginBottom).toBeCloseTo(metrics.pageHeight, 5)
+    expect(metrics.contentWidth).toBeGreaterThan(0)
+    expect(metrics.contentHeight).toBeGreaterThan(0)
   })
 
   it('paginates many long line items and tolerates large totals and missing optional data', () => {
