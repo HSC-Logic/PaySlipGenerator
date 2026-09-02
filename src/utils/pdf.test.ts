@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PaymentSlip } from '../types'
-import { buildPdf, pdfFilename } from './pdf'
+import { buildPdf, createPdfBlob, pdfFilename } from './pdf'
 
 const sample: PaymentSlip = {
   company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#123456' },
@@ -18,8 +18,17 @@ describe('PDF generation', () => {
     expect(pdfFilename(sample)).toBe('Payment-Slip-PAY-001-A-Recipient-With-A-Deliberately-Long-Name-For-Wrapping.pdf')
   })
 
+  it('creates a reusable PDF blob for output actions', () => {
+    const blob = createPdfBlob(sample)
+    expect(blob.type).toBe('application/pdf')
+    expect(blob.size).toBeGreaterThan(3000)
+  })
+
   it.each([
-    ['a4', 'portrait', 210, 297], ['a5', 'portrait', 148, 210], ['b5', 'portrait', 176, 250], ['letter', 'portrait', 216, 279], ['a4', 'landscape', 297, 210],
+    ['a4', 'portrait', 210, 297], ['a4', 'landscape', 297, 210],
+    ['a5', 'portrait', 148, 210], ['a5', 'landscape', 210, 148],
+    ['b5', 'portrait', 176, 250], ['b5', 'landscape', 250, 176],
+    ['letter', 'portrait', 216, 279], ['letter', 'landscape', 279, 216],
   ] as const)('uses %s %s page dimensions', (paperSize, orientation, width, height) => {
     const pdf = buildPdf({ ...sample, payment: { ...sample.payment, paperSize, orientation } })
     expect(pdf.internal.pageSize.getWidth()).toBeCloseTo(width, 0)
@@ -36,5 +45,20 @@ describe('PDF generation', () => {
   it('accepts a logo without failing document creation', () => {
     const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M/wHwAF/gL+W9eWAAAAAElFTkSuQmCC'
     expect(() => buildPdf({ ...sample, company: { ...sample.company, logo } })).not.toThrow()
+  })
+
+  it('renders notes, adjustments, acknowledgement and authorization details', () => {
+    const complete: PaymentSlip = {
+      ...sample,
+      company: { ...sample.company, authorizedName: 'Authorized Person', authorizedDesignation: 'Finance Manager' },
+      payment: { ...sample.payment, notes: 'Please retain this slip as acknowledgement of payment.', adjustment: -50, sealText: 'Thank You', method: 'Bank Transfer', bankName: 'Example Bank', transactionReference: 'TXN-123456' },
+      adjustments: [
+        { id: 'discount', label: 'Discount', kind: 'discount', mode: 'percentage', value: 5 },
+        { id: 'vat', label: 'VAT', kind: 'tax', mode: 'percentage', value: 18 },
+        { id: 'delivery', label: 'Delivery', kind: 'delivery', mode: 'fixed', value: 250 },
+      ],
+    }
+    expect(() => buildPdf(complete)).not.toThrow()
+    expect(buildPdf(complete).output('arraybuffer').byteLength).toBeGreaterThan(4000)
   })
 })
