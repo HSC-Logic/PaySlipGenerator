@@ -4,7 +4,7 @@ import type { PaymentSlip } from '../types'
 // keeps dirty detection aligned with everything that can affect preview/PDF output.
 const serializeSlip = (slip: PaymentSlip) => JSON.stringify(slip)
 
-export const copySlip = (slip: PaymentSlip): PaymentSlip => JSON.parse(serializeSlip(slip)) as PaymentSlip
+export const copySlip = (slip: PaymentSlip): PaymentSlip => structuredClone(slip)
 
 export const hasUnsavedChanges = (current: PaymentSlip, baseline: PaymentSlip) => serializeSlip(current) !== serializeSlip(baseline)
 

@@ -18,4 +18,10 @@ describe('payment references', () => {
   it('does not reuse issued references and starts a new sequence each year', () => { const storage = new MemoryStorage(); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001'); expect(reserveNextReference({ year: 2027, storage })).toBe('PS-2027-0001'); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0002') })
   it('reuses the active reference on refresh but explicitly generates a new one', () => { const storage = new MemoryStorage(); const session = new MemoryStorage(); expect(currentOrNextReference({ year: 2026, storage, session })).toBe('PS-2026-0001'); expect(currentOrNextReference({ year: 2026, storage, session })).toBe('PS-2026-0001'); expect(generateReference({ year: 2026, storage, session })).toBe('PS-2026-0002') })
   it('ignores malformed and legacy references when parsing PS sequences', () => { expect(parseReference('PS-2026-0042')).toEqual({ year: 2026, sequence: 42 }); expect(parseReference('PAY-2026-0042')).toBeNull(); expect(parseReference('custom-reference')).toBeNull() })
+  it('recovers from malformed persisted reference records', () => {
+    const storage = new MemoryStorage()
+    storage.setItem('payment-slip-reference-state-v1', JSON.stringify({ version: 1, years: { 2026: { last: '99', issued: null }, 2025: { last: 4, issued: ['PS-2025-0004'] } } }))
+    expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001')
+    expect(reserveNextReference({ year: 2025, storage })).toBe('PS-2025-0005')
+  })
 })
