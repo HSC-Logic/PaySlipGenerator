@@ -22,6 +22,6 @@ export function PaymentSlipPreview({ slip }: { slip: PaymentSlip }) {
     <p className="acknowledgement">I acknowledge receipt of the payment stated above.</p>
     <section className="signatures"><div><span>{view.company.authorizedName}</span><i /><strong>Prepared By</strong>{view.company.authorizedDesignation && <small>{view.company.authorizedDesignation}</small>}</div><div><span>&nbsp;</span><i /><strong>Recipient Signature</strong></div><div><span>&nbsp;</span><i /><strong>Signature Date</strong></div></section>
     {view.payment.sealText && <div className="document-seal">{view.payment.sealText}</div>}
-    <footer><span>Generated locally in your browser</span><strong>{view.payment.rawReference}</strong></footer>
+    <footer><span className="sliply-attribution">Generated with Sliply</span><strong>{view.payment.rawReference}</strong></footer>
   </article>
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { contentMarkers, createBasicSlip, createLongContentSlip, createMultiPageSlip, createTypicalSlip } from '../test/fixtures/paymentSlips'
-import { buildPdf, createPdfBlob, getPdfPageMetrics, getPdfTableColumnWidths, pdfFilename } from './pdf'
+import { buildPdf, createPdfBlob, getPdfFooterBaseline, getPdfPageMetrics, getPdfTableColumnWidths, pdfFilename } from './pdf'
 
 const formats = [
   ['a4', 'portrait', 210, 297], ['a4', 'landscape', 297, 210],
@@ -48,6 +48,9 @@ describe('PDF document generation', () => {
       expect(metrics.marginX + metrics.contentWidth).toBeLessThanOrEqual(metrics.pageWidth)
       expect(metrics.contentTop + metrics.contentHeight).toBeCloseTo(metrics.contentBottom, 5)
       expect(metrics.contentBottom + metrics.marginBottom + metrics.footerHeight).toBeCloseTo(metrics.pageHeight, 5)
+      const footerBaseline = getPdfFooterBaseline(metrics)
+      expect(footerBaseline).toBeGreaterThan(metrics.pageHeight - metrics.footerHeight)
+      expect(footerBaseline).toBeLessThan(metrics.pageHeight)
       const columns = getPdfTableColumnWidths(metrics.contentWidth)
       expect(columns).toHaveLength(5)
       expect(columns.every(width => width > 0)).toBe(true)
@@ -61,6 +64,7 @@ describe('PDF document generation', () => {
       const output = buildPdf(slip).output()
       const required = [...Object.values(contentMarkers), 'recipient-marker@example.com', 'ITEM12ENDMARKER']
       for (const marker of required) expect(output).toContain(marker)
+      expect(output).toContain('Generated with Sliply')
     })
 
     it('includes typical optional document sections', () => {
@@ -85,7 +89,8 @@ describe('PDF document generation', () => {
       expect(output.indexOf('ITEM45MARKER')).toBeLessThan(output.lastIndexOf('TOTAL'))
       const pages = pdf.internal.pages as unknown as string[][]
       const finalPage = pages[pages.length - 1].join('\n')
-      expect(finalPage).toContain('Generated locally in your browser')
+      expect(finalPage).not.toContain('Generated locally in your browser')
+      expect(output.split('Generated with Sliply').length - 1).toBe(pdf.getNumberOfPages())
       expect(finalPage).toMatch(/I acknowledge receipt|SEAL|Thank You/)
       expect(finalPage.length).toBeGreaterThan(500)
     })

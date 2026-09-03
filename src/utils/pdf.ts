@@ -37,6 +37,8 @@ export function getPdfPageMetrics(doc: jsPDF, orientation: PdfPageMetrics['orien
   return { pageWidth, pageHeight, marginX, marginTop, marginBottom, footerHeight, contentTop, contentBottom, contentWidth: pageWidth - marginX * 2, contentHeight: contentBottom - contentTop, compact, orientation }
 }
 
+export const getPdfFooterBaseline = (layout: PdfPageMetrics) => layout.pageHeight - layout.footerHeight * 0.35
+
 const splitLines = (doc: jsPDF, value: string, width: number) => value.split(/\r?\n/).flatMap(line => line ? doc.splitTextToSize(line, width) as string[] : [''])
 const lineBlockHeight = (lines: string[], lineHeight: number) => Math.max(1, lines.length) * lineHeight
 export const getPdfTableColumnWidths = (contentWidth: number) => [contentWidth * 0.05, contentWidth * 0.5, contentWidth * 0.09, contentWidth * 0.17, contentWidth * 0.19]
@@ -163,7 +165,8 @@ export function buildPdf(slip: PaymentSlip) {
 
   const pages = doc.getNumberOfPages()
   for (let page = 1; page <= pages; page += 1) {
-    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated locally in your browser', marginX, pageHeight - 3); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, pageHeight - 3 - (referenceLines.length - 1) * bodyLine, { align: 'right' })
+    const footerY = getPdfFooterBaseline(layout)
+    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated with Sliply', marginX, footerY); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, footerY - (referenceLines.length - 1) * bodyLine, { align: 'right' })
   }
   return doc
 }
