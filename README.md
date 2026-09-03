@@ -86,13 +86,14 @@ The application lists folders that the granted `drive.file` scope makes availabl
 
 ## Privacy and security
 
-- Payment information, NIC/ID details, company profiles, drafts, and recovery snapshots are stored in the browser's localStorage. Reusable saved-recipient records deliberately exclude NIC/ID; NIC/ID remains only in payment drafts and recovery snapshots. The active generated reference is also kept in sessionStorage.
+- Payment information, NIC/ID details, company profiles, drafts, recovery snapshots, and explicit history snapshots are stored in the browser's localStorage. Reusable saved-recipient records deliberately exclude NIC/ID; NIC/ID remains only where needed to preserve a draft, recovery snapshot, or historical payment. The active generated reference is kept in sessionStorage.
 - There is no analytics, advertising, behavioral tracking, application backend, or database.
 - The interface loads DM Sans and Manrope from Google Fonts when the page opens. As with any external web resource, that request exposes ordinary connection metadata such as the user's IP address and browser headers to the resource provider; it does not include the payment form contents.
 - The optional Google integration connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Create Google Doc** sends the payment reference in the file title and sends the document's textual payment content to Google Drive and Docs for storage in the user's selected folder. It does not upload the logo.
 - OAuth access tokens are held in memory for the current page session only.
 - Local browser data is not encrypted; avoid using a shared browser profile for sensitive records and clear site data when appropriate.
 - Uploaded logos are limited to image files smaller than 2 MB. Logos are stored as Base64 data, which adds roughly one-third to the source file size; because a logo may also be present in the company profile, explicit draft, and recovery snapshots, large logos can approach browser storage quotas. The application reports quota failures without changing image quality or discarding the in-memory form.
+- The **Privacy & stored data** controls can clear draft/recovery, history, reusable recipients, or reference state independently. **Clear all Sliply data** removes only Sliply-owned keys, resets the open form after confirmation, and does not call `localStorage.clear()` or remove data owned by another application on the same origin.
 
 ### Payment reference persistence
 

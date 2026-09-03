@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
+import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearReferenceData, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -295,6 +295,58 @@ describe('safe persisted data loading', () => {
     expect(loadHistory(storage, createBasicSlip())).toEqual([{ id: 'valid', createdAt: 1, updatedAt: 2, slip }])
     storage.setItem(STORAGE_KEYS.history, '{broken')
     expect(loadHistory(storage, createBasicSlip())).toEqual([])
+  })
+
+  it('clears each sensitive collection through scoped controls', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.draft, 'draft')
+    storage.setItem(STORAGE_KEYS.recovery, 'recovery')
+    storage.setItem(STORAGE_KEYS.history, 'history')
+    storage.setItem(STORAGE_KEYS.recipients, 'recipients')
+    expect(clearDraftData(storage).success).toBe(true)
+    expect(clearHistoryData(storage).success).toBe(true)
+    expect(clearRecipientData(storage).success).toBe(true)
+    expect(storage.getItem(STORAGE_KEYS.draft)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.recovery)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.history)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.recipients)).toBeNull()
+  })
+
+  it('clears reference state and legacy counters without removing unrelated origin data', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    storage.setItem('payment-slip-reference-state-v1', '{}')
+    storage.setItem('payment-slip-sequence-2026', '42')
+    storage.setItem('unrelated-application-key', 'keep')
+    session.setItem('payment-slip-active-reference', 'PS-2026-0042')
+    expect(clearReferenceData(storage, session).success).toBe(true)
+    expect(storage.getItem('payment-slip-reference-state-v1')).toBeNull()
+    expect(storage.getItem('payment-slip-sequence-2026')).toBeNull()
+    expect(session.getItem('payment-slip-active-reference')).toBeNull()
+    expect(storage.getItem('unrelated-application-key')).toBe('keep')
+  })
+
+  it('clears all and only Sliply-owned persistence keys', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    for (const key of Object.values(STORAGE_KEYS)) storage.setItem(key, 'value')
+    storage.setItem('payment-slip-reference-state-v1', '{}')
+    storage.setItem('payment-slip-sequence-2025', '9')
+    storage.setItem('another-app', 'preserved')
+    session.setItem('payment-slip-active-reference', 'PS-2026-0001')
+    expect(clearAllSliplyData(storage, session).success).toBe(true)
+    for (const key of Object.values(STORAGE_KEYS)) expect(storage.getItem(key)).toBeNull()
+    expect(storage.getItem('payment-slip-reference-state-v1')).toBeNull()
+    expect(storage.getItem('payment-slip-sequence-2025')).toBeNull()
+    expect(session.getItem('payment-slip-active-reference')).toBeNull()
+    expect(storage.getItem('another-app')).toBe('preserved')
+  })
+
+  it('reports storage-clearing failures without throwing', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    storage.removeItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(clearAllSliplyData(storage, session)).toMatchObject({ success: false, reason: 'access-denied' })
   })
 
   it.each([

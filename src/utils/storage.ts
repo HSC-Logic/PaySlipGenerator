@@ -228,3 +228,32 @@ export const loadTheme = (storage: Storage): 'light' | 'dark' | null => {
 }
 
 export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => safeSet(storage, STORAGE_KEYS.theme, JSON.stringify(envelope(theme)))
+
+const REFERENCE_STATE_KEY = 'payment-slip-reference-state-v1'
+const ACTIVE_REFERENCE_KEY = 'payment-slip-active-reference'
+const legacyReferenceKey = /^payment-slip-sequence-\d{4}$/
+
+const storageKeys = (storage: Storage) => {
+  try { return Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key): key is string => Boolean(key)) } catch { return [] }
+}
+
+const removeKeys = (storage: Storage, keys: string[]): PersistenceResult => {
+  for (const key of keys) {
+    const result = safeRemove(storage, key)
+    if (!result.success) return result
+  }
+  return { success: true }
+}
+
+export const clearDraftData = (storage: Storage) => removeKeys(storage, [STORAGE_KEYS.draft, STORAGE_KEYS.recovery])
+export const clearHistoryData = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.history)
+export const clearRecipientData = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.recipients)
+export const clearReferenceData = (storage: Storage, session: Storage): PersistenceResult => {
+  const local = removeKeys(storage, [REFERENCE_STATE_KEY, ...storageKeys(storage).filter(key => legacyReferenceKey.test(key))])
+  return local.success ? safeRemove(session, ACTIVE_REFERENCE_KEY) : local
+}
+export const clearAllSliplyData = (storage: Storage, session: Storage): PersistenceResult => {
+  const localKeys = [...Object.values(STORAGE_KEYS), REFERENCE_STATE_KEY, ...storageKeys(storage).filter(key => legacyReferenceKey.test(key))]
+  const local = removeKeys(storage, [...new Set(localKeys)])
+  return local.success ? safeRemove(session, ACTIVE_REFERENCE_KEY) : local
+}
