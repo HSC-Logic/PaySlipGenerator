@@ -5,7 +5,7 @@ import { ReviewPanel } from './components/forms/ReviewPanel'
 import { PaymentSlipPreview } from './components/preview/PaymentSlipPreview'
 import { WorkflowStepper, workflowSteps } from './components/common/WorkflowStepper'
 import type { GoogleDriveState, PaymentSlip, SavedRecipient, WorkflowStep } from './types'
-import { finalTotal, formatCurrency, subtotal } from './utils/currency'
+import { calculatePaymentTotals, formatCurrency } from './utils/currency'
 import { currentOrNextReference, generateReference } from './utils/reference'
 import { errorsForStep, validateSlip } from './utils/validation'
 import { buildPdf, downloadPdfDocument, printPdfDocument } from './utils/pdf'
@@ -45,7 +45,7 @@ export default function App() {
   const [storageWarning, setStorageWarning] = useState('')
   const [drive, setDrive] = useState<GoogleDriveState>({ connected: false, folderId: '', folderName: '', documentUrl: '' })
   const preview = useRef<HTMLDivElement>(null); const referenceInitialized = useRef(false); const allErrors = useMemo(() => validateSlip(slip), [slip]); const visibleErrors = attempted || attemptedStep === activeStep ? errorsForStep(allErrors, activeStep) : {}
-  const valid = Object.keys(allErrors).length === 0; const total = finalTotal(slip.items, slip.payment.adjustment, slip.adjustments)
+  const valid = Object.keys(allErrors).length === 0; const calculation = useMemo(() => calculatePaymentTotals(slip.items, slip.payment.adjustment, slip.adjustments), [slip.items, slip.payment.adjustment, slip.adjustments]); const total = calculation.final
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(null), 4500); return () => clearTimeout(timer) }, [notice])
   const recordBackgroundPersistence = (result: PersistenceResult) => { if (!result.success) setStorageWarning(persistenceMessage(result, 'Automatic recovery')); else setStorageWarning('') }
   useEffect(() => { document.documentElement.dataset.theme = darkMode ? 'dark' : 'light' }, [darkMode])
@@ -115,7 +115,7 @@ export default function App() {
         </section>{storageWarning && <p className="storage-warning" role="status">{storageWarning}</p>}<p className="privacy-note"><LockKeyhole /> Payment data stays on this device unless you choose to create a Google Doc.</p><div className="developer-mark">Developed by <a href="https://hsclogic.com/" target="_blank" rel="noreferrer">HSC Logic</a></div></div>
         <aside className="preview-pane" ref={preview}><div className="preview-toolbar"><div><Eye /><span>Live preview</span><i>{slip.payment.paperSize.toUpperCase()} · {slip.payment.orientation === 'portrait' ? 'Portrait' : 'Landscape'}</i></div><div className="total-chip"><span>Total</span><strong>{formatCurrency(total, slip.payment.currency)}</strong></div></div><div className="paper-wrap"><PaymentSlipPreview slip={slip} /></div></aside></div>
     </main>
-    {activeStep === 'review' && <div className="action-dock"><div><span>Subtotal</span><strong>{formatCurrency(subtotal(slip.items), slip.payment.currency)}</strong></div><button className="button secondary" onClick={showPreview}><Eye /> Preview</button><button className="button secondary" disabled={!valid || !!busy} onClick={() => requireValid(() => void documentAction('print'))}>{busy === 'print' ? <LoaderCircle className="spin" /> : <Printer />} Print</button><button className="button primary" disabled={!valid || !!busy} onClick={() => requireValid(() => void documentAction('download'))}>{busy === 'download' ? <LoaderCircle className="spin" /> : <Download />} Generate PDF</button><button className="button secondary" onClick={similar}><CopyPlus /> Create similar slip</button><button className="button secondary" onClick={another}><FilePlus2 /> New blank slip</button></div>}
+    {activeStep === 'review' && <div className="action-dock"><div><span>Subtotal</span><strong>{formatCurrency(calculation.subtotal, slip.payment.currency)}</strong></div><button className="button secondary" onClick={showPreview}><Eye /> Preview</button><button className="button secondary" disabled={!valid || !!busy} onClick={() => requireValid(() => void documentAction('print'))}>{busy === 'print' ? <LoaderCircle className="spin" /> : <Printer />} Print</button><button className="button primary" disabled={!valid || !!busy} onClick={() => requireValid(() => void documentAction('download'))}>{busy === 'download' ? <LoaderCircle className="spin" /> : <Download />} Generate PDF</button><button className="button secondary" onClick={similar}><CopyPlus /> Create similar slip</button><button className="button secondary" onClick={another}><FilePlus2 /> New blank slip</button></div>}
     {notice && <div className={`toast ${notice.kind}`} role="status">{notice.kind === 'success' ? <ShieldCheck /> : <span>!</span>}{notice.text}</div>}
   </div>
 }

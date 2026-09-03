@@ -97,6 +97,12 @@ The application lists folders that the granted `drive.file` scope makes availabl
 
 Each new payment reserves the next browser-local reference in the form `PS-2026-0001`. The yearly counter and issued-reference list are stored in `localStorage`; the active reference is also held in `sessionStorage` so refreshing the same tab does not consume another number. “Another slip” and the generate-reference button explicitly reserve the next number. Manual edits are preserved in the payment and in saved drafts. Existing legacy yearly counters and higher `PS-…` references found in the saved draft are used when choosing the next sequence.
 
+### Line items and legacy drafts
+
+Payments use line items with a description, quantity, and rate. Item amounts, subtotal, adjustments, and final total are calculated by one shared minor-unit calculation boundary used by the form, preview, PDF, and optional Google Doc output. Values are rounded to the nearest currency minor unit so decimal arithmetic does not expose binary floating-point artifacts.
+
+When loading an older unversioned draft that has no `items` array, a valid `description` and `amount` pair—stored either on the draft or its payment section—is migrated in memory to one item with quantity `1` and the legacy amount as its rate. The original stored value is not rewritten until the user explicitly saves the draft. Malformed legacy amounts fall back safely instead of loading an invalid payment.
+
 ## Known limitations
 
 - Browser storage belongs to one browser profile/device and is not synchronized or backed up.

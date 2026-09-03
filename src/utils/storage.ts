@@ -118,10 +118,19 @@ const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
  * still have the expected runtime shape before a draft is accepted.
  */
 const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
-  if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment) || !Array.isArray(value.items)) return null
+  if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment)) return null
   const company = companyFrom(value.company, defaults.company)
   if (!company) return null
-  const items = value.items.map((item, index) => {
+  const legacyDescription = typeof value.description === 'string' ? value.description : typeof value.payment.description === 'string' ? value.payment.description : null
+  const legacyAmountValue = value.amount ?? value.payment.amount
+  const legacyAmount = typeof legacyAmountValue === 'number' && Number.isFinite(legacyAmountValue) ? legacyAmountValue : typeof legacyAmountValue === 'string' && legacyAmountValue.trim() && Number.isFinite(Number(legacyAmountValue)) ? Number(legacyAmountValue) : null
+  const sourceItems: unknown[] | null = Array.isArray(value.items)
+    ? value.items
+    : legacyDescription !== null && legacyAmount !== null
+      ? [{ id: defaults.items[0]?.id ?? 'legacy-item-1', description: legacyDescription, quantity: 1, rate: legacyAmount }]
+      : null
+  if (!sourceItems) return null
+  const items = sourceItems.map((item, index) => {
     if (!isRecord(item) || typeof item.description !== 'string') return null
     return {
       id: text(item.id, `${defaults.items[0]?.id ?? 'item'}-${index + 1}`),

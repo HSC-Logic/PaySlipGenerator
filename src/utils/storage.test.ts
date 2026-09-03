@@ -111,6 +111,27 @@ describe('safe persisted data loading', () => {
     expect(loaded?.adjustments).toEqual([])
   })
 
+  it.each([
+    ['root fields', { description: 'Legacy service', amount: 1250.5 }],
+    ['payment fields', { payment: { description: 'Legacy service', amount: '1250.50' } }],
+  ])('migrates legacy description and amount from %s into one line item', (_name, legacyFields) => {
+    const storage = new MemoryStorage()
+    const legacy = createBasicSlip() as unknown as Record<string, unknown>
+    delete legacy.items
+    const payment = { ...(legacy.payment as Record<string, unknown>), ...('payment' in legacyFields ? legacyFields.payment : {}) }
+    const value = { ...legacy, ...legacyFields, payment }
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify(value))
+    expect(loadDraft(storage, createBasicSlip())?.items).toEqual([{ id: 'item-1', description: 'Legacy service', quantity: 1, rate: 1250.5 }])
+  })
+
+  it('rejects a pre-item draft when its legacy amount is malformed', () => {
+    const storage = new MemoryStorage()
+    const legacy = createBasicSlip() as unknown as Record<string, unknown>
+    delete legacy.items
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...legacy, description: 'Legacy service', amount: 'not-a-number' }))
+    expect(loadDraft(storage, createBasicSlip())).toBeNull()
+  })
+
   it('recovers a malformed company profile field-by-field', () => {
     const storage = new MemoryStorage()
     const fallback = createBasicSlip().company

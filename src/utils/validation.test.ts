@@ -45,6 +45,22 @@ describe('workflow validation', () => {
     expect(result['adjustments.0.value']).toBe('Enter a valid value of zero or more.')
   })
 
+  it('rejects negative and empty line-item input while allowing a zero rate', () => {
+    const slip = validSlip()
+    slip.items = [
+      { id: 'empty', description: '', quantity: '', rate: '' },
+      { id: 'negative', description: 'Invalid values', quantity: -1, rate: -0.01 },
+      { id: 'zero', description: 'Free item', quantity: 1, rate: 0 },
+    ]
+    const result = validateSlip(slip)
+    expect(result['items.0.description']).toBe('Description is required.')
+    expect(result['items.0.quantity']).toBe('Enter a quantity greater than zero.')
+    expect(result['items.0.rate']).toBe('Enter a valid rate of zero or more.')
+    expect(result['items.1.quantity']).toBe('Enter a quantity greater than zero.')
+    expect(result['items.1.rate']).toBe('Enter a valid rate of zero or more.')
+    expect(result['items.2.rate']).toBeUndefined()
+  })
+
   it('rejects malformed optional email values only when provided', () => {
     const slip = validSlip()
     slip.company.email = 'not-an-email'
