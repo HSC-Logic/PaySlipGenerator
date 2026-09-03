@@ -21,7 +21,7 @@ export function createBasicSlip(): PaymentSlip {
   return {
     company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#123456' },
     recipient: { name: 'Test Recipient', identification: '', role: '', address: '', email: '', telephone: '' },
-    payment: { date: '2026-08-31', reference: 'PAY/001', title: 'Consulting services', method: 'Cash', bankName: '', transactionReference: '', notes: '', adjustment: 0, currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' },
+    payment: { date: '2026-08-31', reference: 'PAY/001', title: 'Consulting services', method: 'Cash', status: 'draft', paidDate: '', paidReference: '', bankName: '', transactionReference: '', notes: '', adjustment: 0, currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' },
     items: [{ id: 'item-1', description: 'Consulting service', quantity: 2, rate: 1500 }],
     adjustments: [],
   }

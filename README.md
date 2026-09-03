@@ -103,6 +103,10 @@ Payments use line items with a description, quantity, and rate. Item amounts, su
 
 When loading an older unversioned draft that has no `items` array, a valid `description` and `amount` pair—stored either on the draft or its payment section—is migrated in memory to one item with quantity `1` and the legacy amount as its rate. The original stored value is not rewritten until the user explicitly saves the draft. Malformed legacy amounts fall back safely instead of loading an invalid payment.
 
+### Payment status
+
+Payment workflow status is stored using the stable values `draft`, `pending`, `paid`, and `cancelled`. Existing drafts and recovery snapshots without a status load as `draft`, which avoids assuming that an older payment has been settled. Paid date and paid reference are optional and available when editing a Paid payment. They are retained if the status temporarily changes, but a newly created similar slip resets to Draft and clears settlement metadata because it represents a new transaction. Status remains workflow metadata and is not printed on the payment-slip document.
+
 ## Known limitations
 
 - Browser storage belongs to one browser profile/device and is not synchronized or backed up.

@@ -102,13 +102,31 @@ describe('safe persisted data loading', () => {
     delete payment.sealText
     delete payment.paperSize
     delete payment.orientation
+    delete payment.status
+    delete payment.paidDate
+    delete payment.paidReference
     delete legacy.adjustments
     storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...legacy, company, payment }))
 
     const loaded = loadDraft(storage, createBasicSlip())
     expect(loaded?.company.themeColor).toBe('#123456')
-    expect(loaded?.payment).toMatchObject({ currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' })
+    expect(loaded?.payment).toMatchObject({ currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait', status: 'draft', paidDate: '', paidReference: '' })
     expect(loaded?.adjustments).toEqual([])
+  })
+
+  it('persists paid status metadata and safely defaults unknown status values', () => {
+    const storage = new MemoryStorage()
+    const paid = createBasicSlip()
+    paid.payment.status = 'paid'
+    paid.payment.paidDate = '2026-09-03'
+    paid.payment.paidReference = 'SETTLEMENT-42'
+    saveDraft(storage, paid)
+    expect(loadDraft(storage, createBasicSlip())?.payment).toMatchObject({ status: 'paid', paidDate: '2026-09-03', paidReference: 'SETTLEMENT-42' })
+
+    const invalid = structuredClone(paid) as unknown as { payment: Record<string, unknown> }
+    invalid.payment.status = 'archived'
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify(invalid))
+    expect(loadDraft(storage, createBasicSlip())?.payment).toMatchObject({ status: 'draft', paidDate: '2026-09-03', paidReference: 'SETTLEMENT-42' })
   })
 
   it.each([

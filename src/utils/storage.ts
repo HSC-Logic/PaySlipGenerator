@@ -1,4 +1,4 @@
-import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, SavedRecipient, TotalAdjustment } from '../types'
+import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
@@ -155,6 +155,7 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
     payment: {
       date: text(payment.date, defaults.payment.date), reference: text(payment.reference, defaults.payment.reference), title: text(payment.title, defaults.payment.title),
       method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Other'], defaults.payment.method),
+      status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
       adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], defaults.payment.currency),
       sealText: text(payment.sealText, defaults.payment.sealText), paperSize: oneOf<PaperSize>(payment.paperSize, ['a4', 'a5', 'b5', 'letter'], defaults.payment.paperSize),

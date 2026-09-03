@@ -5,7 +5,7 @@ import { errorsForStep, validateSlip } from './validation'
 const validSlip = (): PaymentSlip => ({
   company: { name: 'Example Company', address: 'Colombo', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#0b1f3a' },
   recipient: { name: 'Example Recipient', identification: '', role: 'Consultant', address: '', email: '', telephone: '' },
-  payment: { date: '2026-08-31', reference: 'PAY-001', title: 'Services', method: 'Cash', bankName: '', transactionReference: '', notes: '', adjustment: '', currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' },
+  payment: { date: '2026-08-31', reference: 'PAY-001', title: 'Services', method: 'Cash', status: 'draft', paidDate: '', paidReference: '', bankName: '', transactionReference: '', notes: '', adjustment: '', currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' },
   items: [{ id: '1', description: 'Consulting', quantity: 1, rate: 0 }],
   adjustments: [],
 })
@@ -30,6 +30,16 @@ describe('workflow validation', () => {
 
   it('accepts empty optional fields', () => {
     expect(validateSlip(validSlip())).toEqual({})
+  })
+
+  it('keeps paid metadata optional and ignores it for non-paid statuses', () => {
+    const slip = validSlip()
+    slip.payment.status = 'paid'
+    expect(validateSlip(slip)).toEqual({})
+    slip.payment.paidDate = 'not-a-date'
+    expect(validateSlip(slip)['payment.paidDate']).toBe('Enter a valid paid date or leave it empty.')
+    slip.payment.status = 'pending'
+    expect(validateSlip(slip)['payment.paidDate']).toBeUndefined()
   })
 
   it('rejects malformed and out-of-range numeric values', () => {

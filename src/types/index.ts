@@ -5,10 +5,11 @@ export interface Recipient { name: string; identification: string; role: string;
 /** Reusable browser-local recipient details. Identification is intentionally excluded. */
 export interface SavedRecipient { id: string; name: string; role: string; address: string; email: string; telephone: string }
 export type PaymentMethod = 'Cash' | 'Bank Transfer' | 'Cheque' | 'Other'
+export type PaymentStatus = 'draft' | 'pending' | 'paid' | 'cancelled'
 export type CurrencyCode = 'LKR' | 'USD' | 'EUR' | 'GBP' | 'INR' | 'AUD' | 'CAD' | 'SGD'
 export type PaperSize = 'a4' | 'a5' | 'b5' | 'letter'
 export type PageOrientation = 'portrait' | 'landscape'
-export interface Payment { date: string; reference: string; title: string; method: PaymentMethod; bankName: string; transactionReference: string; notes: string; adjustment: number | ''; currency: CurrencyCode; sealText: string; paperSize: PaperSize; orientation: PageOrientation }
+export interface Payment { date: string; reference: string; title: string; method: PaymentMethod; status: PaymentStatus; paidDate: string; paidReference: string; bankName: string; transactionReference: string; notes: string; adjustment: number | ''; currency: CurrencyCode; sealText: string; paperSize: PaperSize; orientation: PageOrientation }
 export interface PaymentItem { id: string; description: string; quantity: number | ''; rate: number | '' }
 export type AdjustmentKind = 'discount' | 'tax' | 'service' | 'delivery' | 'charge'
 export type AdjustmentMode = 'percentage' | 'fixed'
