@@ -1,4 +1,4 @@
-import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
+import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   theme: 'payment-slip-theme',
   recovery: 'payment-slip-recovery-v1',
   recipients: 'payment-slip-recipients',
+  history: 'payment-slip-history',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -172,6 +173,32 @@ export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip 
 }
 
 export const saveDraft = (storage: Storage, slip: PaymentSlip) => safeSet(storage, STORAGE_KEYS.draft, JSON.stringify(envelope(slip)))
+
+const stableLegacyId = (slip: PaymentSlip, index: number) => {
+  const source = `${slip.payment.reference}|${slip.payment.date}|${slip.recipient.name}|${index}`
+  let hash = 2166136261
+  for (const character of source) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
+  return `legacy-${(hash >>> 0).toString(36)}`
+}
+
+export const loadHistory = (storage: Storage, defaults: PaymentSlip): PaymentRecord[] => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.history)))
+  if (value === invalidVersion || !Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap((entry, index) => {
+    const wrapped = isRecord(entry) && isRecord(entry.slip)
+    const slip = paymentSlipFrom(wrapped ? entry.slip : entry, defaults)
+    if (!slip) return []
+    const id = wrapped && typeof entry.id === 'string' && entry.id ? entry.id : stableLegacyId(slip, index)
+    if (seen.has(id)) return []
+    seen.add(id)
+    const createdAt = wrapped && typeof entry.createdAt === 'number' && Number.isFinite(entry.createdAt) ? entry.createdAt : 0
+    const updatedAt = wrapped && typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) ? entry.updatedAt : createdAt
+    return [{ id, createdAt, updatedAt, slip }]
+  })
+}
+
+export const saveHistory = (storage: Storage, records: PaymentRecord[]) => safeSet(storage, STORAGE_KEYS.history, JSON.stringify(envelope(records)))
 
 export type RecoverySnapshot = { slip: PaymentSlip; baseline: PaymentSlip; savedAt: number }
 

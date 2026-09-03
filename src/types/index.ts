@@ -15,6 +15,7 @@ export type AdjustmentKind = 'discount' | 'tax' | 'service' | 'delivery' | 'char
 export type AdjustmentMode = 'percentage' | 'fixed'
 export interface TotalAdjustment { id: string; label: string; kind: AdjustmentKind; mode: AdjustmentMode; value: number | '' }
 export interface PaymentSlip { company: Company; recipient: Recipient; payment: Payment; items: PaymentItem[]; adjustments: TotalAdjustment[] }
+export interface PaymentRecord { id: string; createdAt: number; updatedAt: number; slip: PaymentSlip }
 export interface GoogleDriveState { connected: boolean; folderId: string; folderName: string; documentUrl: string }
 export type Errors = Record<string, string>
 export type WorkflowStep = 'company' | 'recipient' | 'payment' | 'review'

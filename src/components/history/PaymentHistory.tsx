@@ -1,0 +1,10 @@
+import { CopyPlus, FolderOpen, Search, Trash2 } from 'lucide-react'
+import type { PaymentRecord } from '../../types'
+import { calculatePaymentTotals, formatCurrency } from '../../utils/currency'
+import { paymentStatusLabels } from '../../utils/paymentStatus'
+
+export function PaymentHistory({ records, query, onQuery, onLoad, onDuplicate, onDelete }: { records: PaymentRecord[]; query: string; onQuery: (value: string) => void; onLoad: (record: PaymentRecord) => void; onDuplicate: (record: PaymentRecord) => void; onDelete: (record: PaymentRecord) => void }) {
+  return <details className="history-panel"><summary>Payment history <span>{records.length}</span></summary><div className="history-content"><label className="history-search"><Search /><span className="sr-only">Search payment history</span><input value={query} onChange={event => onQuery(event.target.value)} placeholder="Search reference, recipient, company, purpose or status" /></label>
+    {!records.length ? <p className="history-empty">No matching payment records.</p> : <div className="history-list">{records.map(record => { const total = calculatePaymentTotals(record.slip.items, record.slip.payment.adjustment, record.slip.adjustments).final; return <article key={record.id} className="history-record"><div><strong>{record.slip.payment.reference || 'No reference'}</strong><span>{record.slip.recipient.name || 'No recipient'} · {paymentStatusLabels[record.slip.payment.status]}</span><small>{record.slip.payment.date} · {formatCurrency(total, record.slip.payment.currency)}</small></div><div><button type="button" className="text-button" onClick={() => onLoad(record)}><FolderOpen /> Edit</button><button type="button" className="text-button" onClick={() => onDuplicate(record)}><CopyPlus /> Duplicate</button><button type="button" className="icon-danger" aria-label={`Delete ${record.slip.payment.reference || 'payment record'}`} onClick={() => onDelete(record)}><Trash2 /></button></div></article> })}</div>}
+  </div></details>
+}

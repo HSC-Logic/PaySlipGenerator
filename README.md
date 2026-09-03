@@ -16,6 +16,7 @@ A browser-based payment-slip workspace for creating professional payment records
 - Sharp, text-based PDF export through jsPDF (not a screenshot)
 - Printing from the same generated PDF used by downloads
 - Browser-local saved company profile, reusable recipients, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
+- Searchable browser-local payment history with snapshot editing and duplication
 - Field-level validation, accessible labels, notices, and loading states
 - Optional, session-only Google Drive OAuth and Google Docs creation
 - Automated calculation/reference tests and GitHub Pages deployment workflow
@@ -107,10 +108,16 @@ When loading an older unversioned draft that has no `items` array, a valid `desc
 
 Payment workflow status is stored using the stable values `draft`, `pending`, `paid`, and `cancelled`. Existing drafts and recovery snapshots without a status load as `draft`, which avoids assuming that an older payment has been settled. Paid date and paid reference are optional and available when editing a Paid payment. They are retained if the status temporarily changes, but a newly created similar slip resets to Draft and clears settlement metadata because it represents a new transaction. Status remains workflow metadata and is not printed on the payment-slip document.
 
+### Payment history
+
+History uses the versioned `payment-slip-history` localStorage key. Each record contains a UUID record ID, created/updated timestamps, and a complete payment-slip snapshot. Record identity is independent from the human-readable payment reference, so duplicate reference text cannot cause an accidental overwrite. Loading a record copies its snapshot into the editor; changes are persisted only when **Update record** is selected. Company-profile and saved-recipient edits therefore do not rewrite historical entries.
+
+Duplicating history copies company, recipient, line items, and reusable payment context, then generates a new payment reference and date, resets status to Draft, clears paid metadata and transaction reference, and assigns fresh item/adjustment IDs. The duplicate is not added to history until explicitly saved. Legacy unversioned arrays of raw payment slips are accepted and receive deterministic `legacy-…` IDs in memory. Invalid entries and duplicate record IDs are skipped without preventing the application from opening.
+
 ## Known limitations
 
 - Browser storage belongs to one browser profile/device and is not synchronized or backed up.
-- Clearing site data removes saved settings, drafts, and the local reference sequence.
+- Clearing site data removes saved settings, recipients, drafts, history, and the local reference sequence.
 - Reference numbers are unique only within the locally available browser profile and year. Separate devices/profiles are not coordinated, and simultaneous creation in multiple tabs is not an atomic distributed operation.
 - Reserved or deleted payments can leave sequence gaps; references are intentionally not reused.
 - Google authorization requires an owner-supplied OAuth client ID and correct authorized origins.

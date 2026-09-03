@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
+import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -253,6 +253,48 @@ describe('safe persisted data loading', () => {
     storage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
     expect(saveRecipients(storage, recipients)).toMatchObject({ success: false, reason: 'access-denied' })
     expect(recipients).toHaveLength(1)
+  })
+
+  it('round-trips history snapshots with record IDs independent from references', () => {
+    const storage = new MemoryStorage()
+    const first = createBasicSlip()
+    const second = structuredClone(first)
+    second.recipient.name = 'Second snapshot'
+    const records = [
+      { id: 'record-1', createdAt: 10, updatedAt: 20, slip: first },
+      { id: 'record-2', createdAt: 30, updatedAt: 40, slip: second },
+    ]
+    expect(saveHistory(storage, records).success).toBe(true)
+    const loaded = loadHistory(storage, createBasicSlip())
+    expect(loaded.map(record => record.id)).toEqual(['record-1', 'record-2'])
+    expect(loaded.map(record => record.slip.payment.reference)).toEqual(['PAY/001', 'PAY/001'])
+    loaded[0].slip.company.name = 'Edited copy'
+    expect(records[0].slip.company.name).toBe('Example Company')
+  })
+
+  it('migrates legacy raw-slip history entries to deterministic IDs', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.history, JSON.stringify([createBasicSlip()]))
+    const firstLoad = loadHistory(storage, createBasicSlip())
+    const secondLoad = loadHistory(storage, createBasicSlip())
+    expect(firstLoad).toHaveLength(1)
+    expect(firstLoad[0].id).toMatch(/^legacy-/)
+    expect(secondLoad[0].id).toBe(firstLoad[0].id)
+    expect(firstLoad[0]).toMatchObject({ createdAt: 0, updatedAt: 0 })
+  })
+
+  it('skips malformed and duplicate-ID history records without crashing', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    storage.setItem(STORAGE_KEYS.history, JSON.stringify({ version: 1, data: [
+      { id: 'valid', createdAt: 1, updatedAt: 2, slip },
+      { id: 'valid', createdAt: 3, updatedAt: 4, slip },
+      { id: 'broken', slip: { company: null } },
+      null,
+    ] }))
+    expect(loadHistory(storage, createBasicSlip())).toEqual([{ id: 'valid', createdAt: 1, updatedAt: 2, slip }])
+    storage.setItem(STORAGE_KEYS.history, '{broken')
+    expect(loadHistory(storage, createBasicSlip())).toEqual([])
   })
 
   it.each([

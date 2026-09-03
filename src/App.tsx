@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, Cloud, CopyPlus, Download, Eye, FilePlus2, F
 import { SlipForm } from './components/forms/SlipForm'
 import { ReviewPanel } from './components/forms/ReviewPanel'
 import { PaymentSlipPreview } from './components/preview/PaymentSlipPreview'
+import { PaymentHistory } from './components/history/PaymentHistory'
 import { WorkflowStepper, workflowSteps } from './components/common/WorkflowStepper'
-import type { GoogleDriveState, PaymentSlip, SavedRecipient, WorkflowStep } from './types'
+import type { GoogleDriveState, PaymentRecord, PaymentSlip, SavedRecipient, WorkflowStep } from './types'
 import { calculatePaymentTotals, formatCurrency } from './utils/currency'
 import { currentOrNextReference, generateReference } from './utils/reference'
 import { errorsForStep, validateSlip } from './utils/validation'
@@ -12,14 +13,14 @@ import { buildPdf, downloadPdfDocument, printPdfDocument } from './utils/pdf'
 import { runDocumentAction } from './utils/documentActions'
 import { createSimilarSlip } from './utils/similarSlip'
 import { copySlip, prepareDestructiveReplacement } from './utils/dirtyState'
-import { clearCompanyProfile, clearRecovery, loadCompanyProfile, loadDraft as loadStoredDraft, loadRecovery, loadRecipients, loadTheme, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveRecipients as saveStoredRecipients, saveTheme, type PersistenceResult } from './utils/storage'
+import { clearCompanyProfile, clearRecovery, loadCompanyProfile, loadDraft as loadStoredDraft, loadHistory, loadRecovery, loadRecipients, loadTheme, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveHistory as saveStoredHistory, saveRecipients as saveStoredRecipients, saveTheme, type PersistenceResult } from './utils/storage'
 import { loadMeaningfulRecovery, persistRecoveryState } from './utils/recovery'
 import { chooseFolder, connectDrive, createGoogleDoc, disconnectDrive, driveConfigured } from './services/googleDrive'
 
 const today = () => new Date().toLocaleDateString('en-CA')
 const blank = (): PaymentSlip => ({ company: { name: '', address: '', telephone: '', email: '', registrationNumber: '', logo: '', authorizedName: '', authorizedDesignation: '', themeColor: '#0b1f3a' }, recipient: { name: '', identification: '', role: '', address: '', email: '', telephone: '' }, payment: { date: today(), reference: '', title: '', method: 'Cash', status: 'draft', paidDate: '', paidReference: '', bankName: '', transactionReference: '', notes: '', adjustment: 0, currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' }, items: [{ id: crypto.randomUUID(), description: '', quantity: 1, rate: 0 }], adjustments: [] })
 type Notice = { kind: 'success' | 'error'; text: string } | null
-const persistedReferences = () => { const defaults = blank(); const draft = loadStoredDraft(localStorage, defaults); const recovery = loadRecovery(localStorage, defaults); return [draft?.payment.reference, recovery?.slip.payment.reference].filter((value): value is string => Boolean(value)) }
+const persistedReferences = () => { const defaults = blank(); const draft = loadStoredDraft(localStorage, defaults); const recovery = loadRecovery(localStorage, defaults); const history = loadHistory(localStorage, defaults); return [draft?.payment.reference, recovery?.slip.payment.reference, ...history.map(record => record.slip.payment.reference)].filter((value): value is string => Boolean(value)) }
 
 const initialPaymentState = () => {
   const defaults = blank()
@@ -37,6 +38,9 @@ export default function App() {
   const [hasCompanyProfile, setHasCompanyProfile] = useState(startup.hasProfile)
   const [savedRecipients, setSavedRecipients] = useState(() => loadRecipients(localStorage))
   const [selectedRecipientId, setSelectedRecipientId] = useState('')
+  const [history, setHistory] = useState(() => loadHistory(localStorage, blank()).sort((a, b) => b.updatedAt - a.updatedAt))
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [activeRecordId, setActiveRecordId] = useState('')
   const cleanSlip = useRef<PaymentSlip>(copySlip(startup.baseline))
   const [darkMode, setDarkMode] = useState(() => { const saved = loadTheme(localStorage); return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches })
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
@@ -46,6 +50,7 @@ export default function App() {
   const [drive, setDrive] = useState<GoogleDriveState>({ connected: false, folderId: '', folderName: '', documentUrl: '' })
   const preview = useRef<HTMLDivElement>(null); const referenceInitialized = useRef(false); const allErrors = useMemo(() => validateSlip(slip), [slip]); const visibleErrors = attempted || attemptedStep === activeStep ? errorsForStep(allErrors, activeStep) : {}
   const valid = Object.keys(allErrors).length === 0; const calculation = useMemo(() => calculatePaymentTotals(slip.items, slip.payment.adjustment, slip.adjustments), [slip.items, slip.payment.adjustment, slip.adjustments]); const total = calculation.final
+  const filteredHistory = useMemo(() => { const query = historyQuery.trim().toLocaleLowerCase(); if (!query) return history; return history.filter(record => [record.slip.payment.reference, record.slip.recipient.name, record.slip.company.name, record.slip.payment.title, record.slip.payment.status].some(value => value.toLocaleLowerCase().includes(query))) }, [history, historyQuery])
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(null), 4500); return () => clearTimeout(timer) }, [notice])
   const recordBackgroundPersistence = (result: PersistenceResult) => { if (!result.success) setStorageWarning(persistenceMessage(result, 'Automatic recovery')); else setStorageWarning('') }
   useEffect(() => { document.documentElement.dataset.theme = darkMode ? 'dark' : 'light' }, [darkMode])
@@ -89,13 +94,26 @@ export default function App() {
     if (!result.success) return tell('error', persistenceMessage(result, 'The saved recipient'))
     setSavedRecipients(next); setSelectedRecipientId(''); tell('success', 'Saved recipient deleted. This payment slip was not changed.')
   }
+  const saveRecord = () => {
+    if (!valid) return requireValid(() => undefined)
+    const now = Date.now()
+    const existing = history.find(record => record.id === activeRecordId)
+    const record: PaymentRecord = { id: existing?.id ?? crypto.randomUUID(), createdAt: existing?.createdAt ?? now, updatedAt: now, slip: copySlip(slip) }
+    const next = [record, ...history.filter(item => item.id !== record.id)]
+    const result = saveStoredHistory(localStorage, next)
+    if (!result.success) return tell('error', persistenceMessage(result, 'The payment record'))
+    setHistory(next); setActiveRecordId(record.id); cleanSlip.current = copySlip(slip); recordBackgroundPersistence(clearRecovery(localStorage)); tell('success', existing ? 'Payment record updated.' : 'Payment added to history.')
+  }
   const resetWorkflow = () => { setActiveStep('company'); setHighestStep(0); setAttemptedStep(null); setAttempted(false); setMobileView('edit') }
-  const acceptReplacement = (next: PaymentSlip) => { recordBackgroundPersistence(clearRecovery(localStorage)); cleanSlip.current = copySlip(next); setSlip(next); setSelectedRecipientId(''); resetWorkflow() }
+  const acceptReplacement = (next: PaymentSlip, recordId = '') => { recordBackgroundPersistence(clearRecovery(localStorage)); cleanSlip.current = copySlip(next); setSlip(next); setSelectedRecipientId(''); setActiveRecordId(recordId); resetWorkflow() }
   const destructiveReplacement = (message: string, createReplacement: () => PaymentSlip) => prepareDestructiveReplacement({ current: slip, baseline: cleanSlip.current, confirmDiscard: () => confirm(message), createReplacement })
   const loadDraft = () => { const draft = loadStoredDraft(localStorage, blank()); if (!draft) return tell('error', 'No valid saved draft was found on this device.'); const next = destructiveReplacement('Load the saved draft? Unsaved changes to this slip will be lost.', () => draft); if (!next) return; acceptReplacement(next); tell('success', 'Draft loaded.') }
   const clear = () => { const next = destructiveReplacement('Clear this payment slip? Unsaved information will be lost.', () => { const cleared = blank(); cleared.company = copySlip(slip).company; cleared.payment.reference = slip.payment.reference || currentOrNextReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }); return cleared }); if (!next) return; acceptReplacement(next); tell('success', 'Form cleared. Company details and payment reference were kept.') }
   const another = () => { const next = destructiveReplacement('Create a new blank slip? Unsaved changes to this slip will be lost.', () => { const created = blank(); created.company = loadCompanyProfile(localStorage, created.company) ?? created.company; created.payment.reference = generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }); return created }); if (!next) return; acceptReplacement(next); scrollTo({ top: 0, behavior: 'smooth' }); tell('success', 'A new payment slip is ready.') }
   const similar = () => { const next = createSimilarSlip(slip, { reference: generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }), date: today() }); acceptReplacement(next); scrollTo({ top: 0, behavior: 'smooth' }); tell('success', 'A similar slip with a new reference is ready.') }
+  const editRecord = (record: PaymentRecord) => { const next = destructiveReplacement('Edit this saved payment? Unsaved changes to the current slip will be lost.', () => copySlip(record.slip)); if (!next) return; acceptReplacement(next, record.id); tell('success', 'Payment record loaded for editing.') }
+  const duplicateRecord = (record: PaymentRecord) => { const next = destructiveReplacement('Duplicate this saved payment? Unsaved changes to the current slip will be lost.', () => createSimilarSlip(record.slip, { reference: generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }), date: today() })); if (!next) return; acceptReplacement(next); tell('success', 'Duplicate created as a new draft with a new reference.') }
+  const deleteRecord = (record: PaymentRecord) => { if (!confirm(`Delete payment record ${record.slip.payment.reference || record.id}? This cannot be undone.`)) return; const next = history.filter(item => item.id !== record.id); const result = saveStoredHistory(localStorage, next); if (!result.success) return tell('error', persistenceMessage(result, 'The payment history')); setHistory(next); if (activeRecordId === record.id) setActiveRecordId(''); tell('success', 'Payment record deleted. The current slip was not changed.') }
   const selectStep = (step: WorkflowStep) => { const index = workflowSteps.findIndex(item => item.id === step); if (index <= highestStep) { setActiveStep(step); setAttemptedStep(null); setMobileView('edit'); scrollTo({ top: 0, behavior: 'smooth' }) } }
   const nextStep = () => { const currentErrors = errorsForStep(allErrors, activeStep); if (Object.keys(currentErrors).length) { const first = Object.keys(currentErrors)[0]; setAttemptedStep(activeStep); tell('error', `Please correct the highlighted ${activeStep} field before continuing.`); focusError(first); return } const nextIndex = Math.min(workflowSteps.findIndex(item => item.id === activeStep) + 1, workflowSteps.length - 1); setHighestStep(value => Math.max(value, nextIndex)); setActiveStep(workflowSteps[nextIndex].id); setAttemptedStep(null); setMobileView('edit'); scrollTo({ top: 0, behavior: 'smooth' }) }
   const previousStep = () => { const previousIndex = Math.max(workflowSteps.findIndex(item => item.id === activeStep) - 1, 0); setActiveStep(workflowSteps[previousIndex].id); setAttemptedStep(null); setMobileView('edit'); scrollTo({ top: 0, behavior: 'smooth' }) }
@@ -104,7 +122,8 @@ export default function App() {
   const documentAction = (action: 'download' | 'print') => runDocumentAction({ action, slip, build: buildPdf, download: downloadPdfDocument, print: printPdfDocument, setBusy, notify: tell, reportError: import.meta.env.DEV ? error => console.error(error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { name: 'Unknown document error' }) : undefined })
   return <div className="app-shell">
     <header className="app-header"><div className="app-brand"><div className="brand-mark"><FilePlus2 /></div><div><strong>Sliply</strong><span>Payment Slip Generator</span></div></div><div className="header-status"><button className="theme-toggle" onClick={toggleDarkMode} aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`} title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}>{darkMode ? <Sun /> : <Moon />}<span>{darkMode ? 'Light mode' : 'Dark mode'}</span></button><div className="privacy-pill"><ShieldCheck /> Browser-based</div></div></header>
-    <main><section className="workspace-intro"><div><span className="eyebrow">DOCUMENT WORKSPACE</span><h1>Create a payment slip</h1><p>Complete four clear steps. Your information stays in place as you move between them.</p></div><div className="header-actions"><button className="button secondary" onClick={loadDraft}><FolderOpen /> Load draft</button><button className="button secondary" onClick={saveDraft}><Save /> Save draft</button><button className="button danger-subtle" onClick={clear}><RotateCcw /> Clear</button></div></section>
+    <main><section className="workspace-intro"><div><span className="eyebrow">DOCUMENT WORKSPACE</span><h1>Create a payment slip</h1><p>Complete four clear steps. Your information stays in place as you move between them.</p></div><div className="header-actions"><button className="button secondary" onClick={loadDraft}><FolderOpen /> Load draft</button><button className="button secondary" onClick={saveDraft}><Save /> Save draft</button><button className="button secondary" onClick={saveRecord}><Save /> {activeRecordId ? 'Update record' : 'Save to history'}</button><button className="button danger-subtle" onClick={clear}><RotateCcw /> Clear</button></div></section>
+      <PaymentHistory records={filteredHistory} query={historyQuery} onQuery={setHistoryQuery} onLoad={editRecord} onDuplicate={duplicateRecord} onDelete={deleteRecord} />
       <WorkflowStepper active={activeStep} highestIndex={highestStep} onSelect={selectStep} />
       <div className="mobile-view-switch" role="group" aria-label="Workspace view"><button type="button" className={mobileView === 'edit' ? 'active' : ''} aria-pressed={mobileView === 'edit'} onClick={() => setMobileView('edit')}>Edit</button><button type="button" className={mobileView === 'preview' ? 'active' : ''} aria-pressed={mobileView === 'preview'} onClick={showPreview}><Eye /> Preview</button></div>
       <div className={`workspace mobile-${mobileView}`}><div className="form-pane">{activeStep === 'review' ? <ReviewPanel slip={slip} errors={allErrors} /> : <SlipForm slip={slip} errors={visibleErrors} step={activeStep} hasCompanyProfile={hasCompanyProfile} savedRecipients={savedRecipients} selectedRecipientId={selectedRecipientId} onChange={setSlip} onSubmit={nextStep} onReference={() => setSlip({ ...slip, payment: { ...slip.payment, reference: generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }) } })} onSaveCompany={saveCompany} onClearCompany={clearCompany} onSelectRecipient={selectRecipient} onSaveRecipient={saveRecipient} onDeleteRecipient={deleteRecipient} onLogoError={x => tell('error', x)} />}
