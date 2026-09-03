@@ -1,4 +1,4 @@
-import type { Company, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, TotalAdjustment } from '../types'
+import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
@@ -45,6 +45,7 @@ export const persistenceMessage = (result: PersistenceResult, subject: string) =
 }
 
 const text = (value: unknown, fallback: string) => typeof value === 'string' ? value : fallback
+const persistedLogo = (value: unknown, fallback: string) => typeof value === 'string' && (value === '' || value.startsWith('data:image/')) ? value : fallback
 const numeric = (value: unknown, fallback: number | ''): number | '' => value === '' || (typeof value === 'number' && Number.isFinite(value)) ? value : fallback
 const oneOf = <T extends string>(value: unknown, values: readonly T[], fallback: T): T => typeof value === 'string' && values.includes(value as T) ? value as T : fallback
 const VERSION = 1 as const
@@ -59,18 +60,21 @@ const companyFrom = (value: unknown, fallback: Company): Company | null => {
   if (!isRecord(value)) return null
   return {
     name: text(value.name, fallback.name), address: text(value.address, fallback.address), telephone: text(value.telephone, fallback.telephone),
-    email: text(value.email, fallback.email), registrationNumber: text(value.registrationNumber, fallback.registrationNumber), logo: text(value.logo, fallback.logo),
+    email: text(value.email, fallback.email), registrationNumber: text(value.registrationNumber, fallback.registrationNumber), logo: persistedLogo(value.logo, fallback.logo),
     authorizedName: text(value.authorizedName, fallback.authorizedName), authorizedDesignation: text(value.authorizedDesignation, fallback.authorizedDesignation),
     themeColor: text(value.themeColor, fallback.themeColor),
   }
 }
 
-export const loadCompany = (storage: Storage, fallback: Company): Company => {
+export const loadCompanyProfile = (storage: Storage, fallback: Company): CompanyProfile | null => {
   const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.company)))
-  return value === invalidVersion ? { ...fallback } : companyFrom(value, fallback) ?? { ...fallback }
+  return value === invalidVersion ? null : companyFrom(value, fallback)
 }
 
-export const saveCompany = (storage: Storage, company: Company) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
+export const loadCompany = (storage: Storage, fallback: Company): Company => loadCompanyProfile(storage, fallback) ?? { ...fallback }
+
+export const saveCompany = (storage: Storage, company: CompanyProfile) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
+export const clearCompanyProfile = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.company)
 
 const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.label !== 'string') return null

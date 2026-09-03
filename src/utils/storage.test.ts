@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { loadCompany, loadDraft, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
+import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -131,6 +131,49 @@ describe('safe persisted data loading', () => {
     expect(loadTheme(storage)).toBe('dark')
     storage.setItem(STORAGE_KEYS.theme, 'unknown')
     expect(loadTheme(storage)).toBeNull()
+  })
+
+  it('distinguishes a missing profile from a valid returning-user profile', () => {
+    const storage = new MemoryStorage()
+    const fallback = { ...createBasicSlip().company, name: '' }
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    expect(saveCompany(storage, createBasicSlip().company).success).toBe(true)
+    expect(loadCompanyProfile(storage, fallback)).toEqual(createBasicSlip().company)
+  })
+
+  it('updates and clears the single saved company profile without changing caller data', () => {
+    const storage = new MemoryStorage()
+    const original = createBasicSlip().company
+    const updated = { ...original, name: 'Updated Company' }
+    saveCompany(storage, original)
+    saveCompany(storage, updated)
+    expect(loadCompanyProfile(storage, original)).toEqual(updated)
+    expect(clearCompanyProfile(storage).success).toBe(true)
+    expect(loadCompanyProfile(storage, original)).toBeNull()
+    expect(updated.name).toBe('Updated Company')
+  })
+
+  it('persists Base64 logos but rejects stale object URLs during loading', () => {
+    const storage = new MemoryStorage()
+    const fallback = { ...createBasicSlip().company, logo: '' }
+    const profile = { ...fallback, logo: 'data:image/png;base64,AAAA' }
+    saveCompany(storage, profile)
+    expect(loadCompanyProfile(storage, fallback)?.logo).toBe(profile.logo)
+    storage.setItem(STORAGE_KEYS.company, JSON.stringify({ ...profile, logo: 'blob:https://example.test/stale' }))
+    expect(loadCompanyProfile(storage, fallback)?.logo).toBe('')
+  })
+
+  it('handles corrupted and unavailable profile storage without crashing', () => {
+    const storage = new MemoryStorage()
+    const fallback = createBasicSlip().company
+    storage.setItem(STORAGE_KEYS.company, '{broken')
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    storage.getItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    storage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    storage.removeItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    expect(saveCompany(storage, fallback)).toMatchObject({ success: false, reason: 'access-denied' })
+    expect(clearCompanyProfile(storage)).toMatchObject({ success: false, reason: 'access-denied' })
   })
 
   it.each([

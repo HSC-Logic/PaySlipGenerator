@@ -4,10 +4,10 @@ import type { Errors, PaymentSlip, WorkflowStep } from '../../types'
 import { currencies, formatCurrency, itemAmount } from '../../utils/currency'
 import { Field, Input, Select, TextArea } from '../common/Field'
 
-interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
+interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; hasCompanyProfile: boolean; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onClearCompany: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
 const Section = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => <section className="form-section"><h2>{icon}{title}</h2>{children}</section>
 
-export function SlipForm({ slip, errors, step, onChange, onReference, onSaveCompany, onLogoError, onSubmit }: Props) {
+export function SlipForm({ slip, errors, step, hasCompanyProfile, onChange, onReference, onSaveCompany, onClearCompany, onLogoError, onSubmit }: Props) {
   const set = (group: 'company' | 'recipient' | 'payment', key: string, value: string | number) => onChange({ ...slip, [group]: { ...slip[group], [key]: value } })
   const numericValue = (value: string) => value === '' ? '' : Number(value)
   const logo = (event: ChangeEvent<HTMLInputElement>) => {
@@ -27,7 +27,7 @@ export function SlipForm({ slip, errors, step, onChange, onReference, onSaveComp
       <div className="field-grid"><Field label="Telephone"><Input type="tel" autoComplete="tel" value={slip.company.telephone} onChange={e => set('company', 'telephone', e.target.value)} /></Field><Field label="Email" errorKey={errors['company.email'] ? 'company.email' : undefined} error={errors['company.email']}><Input type="email" autoComplete="email" value={slip.company.email} onChange={e => set('company', 'email', e.target.value)} /></Field></div>
       <div className="field-grid"><Field label="Authorized person"><Input value={slip.company.authorizedName} onChange={e => set('company', 'authorizedName', e.target.value)} /></Field><Field label="Designation"><Input value={slip.company.authorizedDesignation} onChange={e => set('company', 'authorizedDesignation', e.target.value)} /></Field></div>
       <Field label="Company theme color" errorKey={errors['company.themeColor'] ? 'company.themeColor' : undefined} error={errors['company.themeColor']} hint="Used for headings, totals, borders, and the optional seal."><div className="color-control"><Input id="company-theme-picker" type="color" value={/^#[0-9a-f]{6}$/i.test(slip.company.themeColor) ? slip.company.themeColor : '#0b1f3a'} onChange={e => set('company', 'themeColor', e.target.value)} aria-label="Choose company theme color" /><Input id="company-theme-hex" value={slip.company.themeColor} pattern="#[0-9A-Fa-f]{6}" maxLength={7} onChange={e => set('company', 'themeColor', e.target.value)} aria-label="Company theme color hex value" /><Palette /></div></Field>
-      <div className="inline-actions"><label className="button secondary file-button"><Upload /> Upload logo<input type="file" accept="image/*" onChange={logo} /></label>{slip.company.logo && <button type="button" className="text-button" onClick={() => set('company', 'logo', '')}>Remove logo</button>}<button type="button" className="button secondary push" onClick={onSaveCompany}><Save /> Save company</button></div>
+      <div className="inline-actions"><label className="button secondary file-button"><Upload /> Upload logo<input type="file" accept="image/*" onChange={logo} /></label>{slip.company.logo && <button type="button" className="text-button" onClick={() => set('company', 'logo', '')}>Remove logo</button>}{hasCompanyProfile && <button type="button" className="text-button" onClick={onClearCompany}>Clear saved profile</button>}<button type="button" className="button secondary push" onClick={onSaveCompany}><Save /> {hasCompanyProfile ? 'Update profile' : 'Save profile'}</button></div>
     </Section>
     </>}
     {step === 'recipient' && <>

@@ -1,4 +1,6 @@
 export interface Company { name: string; address: string; telephone: string; email: string; registrationNumber: string; logo: string; authorizedName: string; authorizedDesignation: string; themeColor: string }
+/** Browser-local defaults applied to newly created payment slips. */
+export type CompanyProfile = Company
 export interface Recipient { name: string; identification: string; role: string; address: string; email: string; telephone: string }
 export type PaymentMethod = 'Cash' | 'Bank Transfer' | 'Cheque' | 'Other'
 export type CurrencyCode = 'LKR' | 'USD' | 'EUR' | 'GBP' | 'INR' | 'AUD' | 'CAD' | 'SGD'
