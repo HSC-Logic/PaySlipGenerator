@@ -1,10 +1,11 @@
-import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, TotalAdjustment } from '../types'
+import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
   draft: 'payment-slip-draft',
   theme: 'payment-slip-theme',
   recovery: 'payment-slip-recovery-v1',
+  recipients: 'payment-slip-recipients',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -75,6 +76,32 @@ export const loadCompany = (storage: Storage, fallback: Company): Company => loa
 
 export const saveCompany = (storage: Storage, company: CompanyProfile) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
 export const clearCompanyProfile = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.company)
+
+const savedRecipientFrom = (value: unknown): SavedRecipient | null => {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id || typeof value.name !== 'string' || !value.name.trim()) return null
+  return {
+    id: value.id,
+    name: value.name,
+    role: text(value.role, ''),
+    address: text(value.address, ''),
+    email: text(value.email, ''),
+    telephone: text(value.telephone, ''),
+  }
+}
+
+export const loadRecipients = (storage: Storage): SavedRecipient[] => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.recipients)))
+  if (value === invalidVersion || !Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap(item => {
+    const recipient = savedRecipientFrom(item)
+    if (!recipient || seen.has(recipient.id)) return []
+    seen.add(recipient.id)
+    return [recipient]
+  })
+}
+
+export const saveRecipients = (storage: Storage, recipients: SavedRecipient[]) => safeSet(storage, STORAGE_KEYS.recipients, JSON.stringify(envelope(recipients)))
 
 const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.label !== 'string') return null

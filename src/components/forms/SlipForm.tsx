@@ -1,13 +1,13 @@
 import { Building2, Contact, CreditCard, FileText, LayoutTemplate, Palette, Plus, RefreshCw, Save, Trash2, Upload } from 'lucide-react'
 import type { ChangeEvent } from 'react'
-import type { Errors, PaymentSlip, WorkflowStep } from '../../types'
+import type { Errors, PaymentSlip, SavedRecipient, WorkflowStep } from '../../types'
 import { currencies, formatCurrency, itemAmount } from '../../utils/currency'
 import { Field, Input, Select, TextArea } from '../common/Field'
 
-interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; hasCompanyProfile: boolean; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onClearCompany: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
+interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; hasCompanyProfile: boolean; savedRecipients: SavedRecipient[]; selectedRecipientId: string; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onClearCompany: () => void; onSelectRecipient: (id: string) => void; onSaveRecipient: () => void; onDeleteRecipient: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
 const Section = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => <section className="form-section"><h2>{icon}{title}</h2>{children}</section>
 
-export function SlipForm({ slip, errors, step, hasCompanyProfile, onChange, onReference, onSaveCompany, onClearCompany, onLogoError, onSubmit }: Props) {
+export function SlipForm({ slip, errors, step, hasCompanyProfile, savedRecipients, selectedRecipientId, onChange, onReference, onSaveCompany, onClearCompany, onSelectRecipient, onSaveRecipient, onDeleteRecipient, onLogoError, onSubmit }: Props) {
   const set = (group: 'company' | 'recipient' | 'payment', key: string, value: string | number) => onChange({ ...slip, [group]: { ...slip[group], [key]: value } })
   const numericValue = (value: string) => value === '' ? '' : Number(value)
   const logo = (event: ChangeEvent<HTMLInputElement>) => {
@@ -32,10 +32,12 @@ export function SlipForm({ slip, errors, step, hasCompanyProfile, onChange, onRe
     </>}
     {step === 'recipient' && <>
     <Section icon={<Contact />} title="Recipient information">
+      <Field label="Saved recipient" hint={savedRecipients.length ? 'Selecting a saved recipient copies their details into this slip. NIC / ID is never saved.' : 'No saved recipients yet. Enter details below and choose Save recipient.'}><Select value={selectedRecipientId} onChange={e => onSelectRecipient(e.target.value)}><option value="">Enter a new recipient</option>{savedRecipients.map(recipient => <option key={recipient.id} value={recipient.id}>{recipient.name} — {recipient.role || recipient.email || recipient.telephone || recipient.id.slice(0, 8)}</option>)}</Select></Field>
       <div className="field-grid"><Field label="Full name" required errorKey={errors['recipient.name'] ? 'recipient.name' : undefined} error={errors['recipient.name']}><Input required autoComplete="name" value={slip.recipient.name} onChange={e => set('recipient', 'name', e.target.value)} /></Field><Field label="NIC / identification"><Input value={slip.recipient.identification} onChange={e => set('recipient', 'identification', e.target.value)} /></Field></div>
       <div className="field-grid"><Field label="Role / designation" required errorKey={errors['recipient.role'] ? 'recipient.role' : undefined} error={errors['recipient.role']}><Input required value={slip.recipient.role} onChange={e => set('recipient', 'role', e.target.value)} /></Field><Field label="Telephone"><Input type="tel" autoComplete="tel" value={slip.recipient.telephone} onChange={e => set('recipient', 'telephone', e.target.value)} /></Field></div>
       <Field label="Address"><TextArea value={slip.recipient.address} onChange={e => set('recipient', 'address', e.target.value)} /></Field>
       <Field label="Email address" errorKey={errors['recipient.email'] ? 'recipient.email' : undefined} error={errors['recipient.email']}><Input type="email" autoComplete="email" value={slip.recipient.email} onChange={e => set('recipient', 'email', e.target.value)} /></Field>
+      <div className="inline-actions">{selectedRecipientId && <button type="button" className="text-button" onClick={onDeleteRecipient}>Delete saved recipient</button>}<button type="button" className="button secondary push" onClick={onSaveRecipient}><Save /> {selectedRecipientId ? 'Update recipient' : 'Save recipient'}</button></div>
     </Section>
     </>}
     {step === 'payment' && <>

@@ -15,7 +15,7 @@ A browser-based payment-slip workspace for creating professional payment records
 - Fixed or percentage discounts, VAT/tax, service, delivery, and custom charges
 - Sharp, text-based PDF export through jsPDF (not a screenshot)
 - Printing from the same generated PDF used by downloads
-- Browser-local saved company profile, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
+- Browser-local saved company profile, reusable recipients, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
 - Field-level validation, accessible labels, notices, and loading states
 - Optional, session-only Google Drive OAuth and Google Docs creation
 - Automated calculation/reference tests and GitHub Pages deployment workflow
@@ -85,7 +85,7 @@ The application lists folders that the granted `drive.file` scope makes availabl
 
 ## Privacy and security
 
-- Payment information, NIC/ID details, company profiles, drafts, and recovery snapshots are stored in the browser's localStorage. The active generated reference is also kept in sessionStorage.
+- Payment information, NIC/ID details, company profiles, drafts, and recovery snapshots are stored in the browser's localStorage. Reusable saved-recipient records deliberately exclude NIC/ID; NIC/ID remains only in payment drafts and recovery snapshots. The active generated reference is also kept in sessionStorage.
 - There is no analytics, advertising, behavioral tracking, application backend, or database.
 - The interface loads DM Sans and Manrope from Google Fonts when the page opens. As with any external web resource, that request exposes ordinary connection metadata such as the user's IP address and browser headers to the resource provider; it does not include the payment form contents.
 - The optional Google integration connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Create Google Doc** sends the payment reference in the file title and sends the document's textual payment content to Google Drive and Docs for storage in the user's selected folder. It does not upload the logo.

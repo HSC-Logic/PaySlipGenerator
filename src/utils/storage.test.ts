@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
+import { clearCompanyProfile, loadCompany, loadCompanyProfile, loadDraft, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -174,6 +174,46 @@ describe('safe persisted data loading', () => {
     expect(loadCompanyProfile(storage, fallback)).toBeNull()
     expect(saveCompany(storage, fallback)).toMatchObject({ success: false, reason: 'access-denied' })
     expect(clearCompanyProfile(storage)).toMatchObject({ success: false, reason: 'access-denied' })
+  })
+
+  it('round-trips saved recipients with stable IDs while omitting identification', () => {
+    const storage = new MemoryStorage()
+    const recipients = [
+      { id: 'recipient-1', name: 'Alex Silva', role: 'Designer', address: '', email: '', telephone: '' },
+      { id: 'recipient-2', name: 'Alex Silva', role: '', address: 'Colombo', email: 'alex@example.com', telephone: '' },
+    ]
+    expect(saveRecipients(storage, recipients).success).toBe(true)
+    expect(loadRecipients(storage)).toEqual(recipients)
+    expect(storage.getItem(STORAGE_KEYS.recipients)).not.toContain('identification')
+  })
+
+  it('loads legacy recipient arrays and skips malformed or duplicate-ID records', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.recipients, JSON.stringify([
+      { id: 'valid', name: 'Valid Recipient', role: 42, unknown: 'ignored' },
+      { id: 'valid', name: 'Duplicate ID' },
+      { id: '', name: 'Missing ID' },
+      { id: 'missing-name' },
+      null,
+    ]))
+    expect(loadRecipients(storage)).toEqual([{ id: 'valid', name: 'Valid Recipient', role: '', address: '', email: '', telephone: '' }])
+  })
+
+  it('returns an empty recipient list for empty, corrupted, non-array, or unknown-version data', () => {
+    const storage = new MemoryStorage()
+    expect(loadRecipients(storage)).toEqual([])
+    for (const value of ['{broken', JSON.stringify({ name: 'not-an-array' }), JSON.stringify({ version: 99, data: [] })]) {
+      storage.setItem(STORAGE_KEYS.recipients, value)
+      expect(loadRecipients(storage)).toEqual([])
+    }
+  })
+
+  it('reports blocked recipient writes without losing the in-memory collection', () => {
+    const storage = new MemoryStorage()
+    const recipients = [{ id: 'recipient-1', name: 'Saved', role: '', address: '', email: '', telephone: '' }]
+    storage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(saveRecipients(storage, recipients)).toMatchObject({ success: false, reason: 'access-denied' })
+    expect(recipients).toHaveLength(1)
   })
 
   it.each([

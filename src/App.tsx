@@ -4,7 +4,7 @@ import { SlipForm } from './components/forms/SlipForm'
 import { ReviewPanel } from './components/forms/ReviewPanel'
 import { PaymentSlipPreview } from './components/preview/PaymentSlipPreview'
 import { WorkflowStepper, workflowSteps } from './components/common/WorkflowStepper'
-import type { GoogleDriveState, PaymentSlip, WorkflowStep } from './types'
+import type { GoogleDriveState, PaymentSlip, SavedRecipient, WorkflowStep } from './types'
 import { finalTotal, formatCurrency, subtotal } from './utils/currency'
 import { currentOrNextReference, generateReference } from './utils/reference'
 import { errorsForStep, validateSlip } from './utils/validation'
@@ -12,7 +12,7 @@ import { buildPdf, downloadPdfDocument, printPdfDocument } from './utils/pdf'
 import { runDocumentAction } from './utils/documentActions'
 import { createSimilarSlip } from './utils/similarSlip'
 import { copySlip, prepareDestructiveReplacement } from './utils/dirtyState'
-import { clearCompanyProfile, clearRecovery, loadCompanyProfile, loadDraft as loadStoredDraft, loadRecovery, loadTheme, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveTheme, type PersistenceResult } from './utils/storage'
+import { clearCompanyProfile, clearRecovery, loadCompanyProfile, loadDraft as loadStoredDraft, loadRecovery, loadRecipients, loadTheme, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveRecipients as saveStoredRecipients, saveTheme, type PersistenceResult } from './utils/storage'
 import { loadMeaningfulRecovery, persistRecoveryState } from './utils/recovery'
 import { chooseFolder, connectDrive, createGoogleDoc, disconnectDrive, driveConfigured } from './services/googleDrive'
 
@@ -35,6 +35,8 @@ export default function App() {
   const [startup] = useState(initialPaymentState)
   const [slip, setSlip] = useState<PaymentSlip>(startup.slip)
   const [hasCompanyProfile, setHasCompanyProfile] = useState(startup.hasProfile)
+  const [savedRecipients, setSavedRecipients] = useState(() => loadRecipients(localStorage))
+  const [selectedRecipientId, setSelectedRecipientId] = useState('')
   const cleanSlip = useRef<PaymentSlip>(copySlip(startup.baseline))
   const [darkMode, setDarkMode] = useState(() => { const saved = loadTheme(localStorage); return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches })
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
@@ -61,8 +63,34 @@ export default function App() {
   const saveDraft = () => { const result = saveStoredDraft(localStorage, slip); if (!result.success) return tell('error', persistenceMessage(result, 'The draft')); cleanSlip.current = copySlip(slip); recordBackgroundPersistence(clearRecovery(localStorage)); tell('success', 'Draft saved on this device.') }
   const saveCompany = () => { const result = saveStoredCompany(localStorage, slip.company); if (!result.success) return tell('error', persistenceMessage(result, 'The company profile')); setHasCompanyProfile(true); cleanSlip.current = { ...cleanSlip.current, company: { ...slip.company } }; recordBackgroundPersistence(persistRecoveryState(localStorage, slip, cleanSlip.current)); tell('success', hasCompanyProfile ? 'Company profile updated on this device.' : 'Company profile saved on this device.') }
   const clearCompany = () => { if (!confirm('Clear the saved company profile? The company details in this payment slip will remain unchanged.')) return; const result = clearCompanyProfile(localStorage); if (!result.success) return tell('error', persistenceMessage(result, 'The company profile')); setHasCompanyProfile(false); tell('success', 'Saved company profile cleared. This payment slip was not changed.') }
+  const savedRecipientSnapshot = (id: string): SavedRecipient => ({ id, name: slip.recipient.name.trim(), role: slip.recipient.role, address: slip.recipient.address, email: slip.recipient.email, telephone: slip.recipient.telephone })
+  const saveRecipient = () => {
+    if (!slip.recipient.name.trim()) return tell('error', 'Enter a recipient name before saving this recipient.')
+    const id = selectedRecipientId || crypto.randomUUID()
+    const snapshot = savedRecipientSnapshot(id)
+    const next = selectedRecipientId ? savedRecipients.map(recipient => recipient.id === id ? snapshot : recipient) : [...savedRecipients, snapshot]
+    const result = saveStoredRecipients(localStorage, next)
+    if (!result.success) return tell('error', persistenceMessage(result, 'The recipient'))
+    setSavedRecipients(next); setSelectedRecipientId(id); tell('success', selectedRecipientId ? 'Saved recipient updated. Existing payment records were not changed.' : 'Recipient saved without NIC / ID.')
+  }
+  const selectRecipient = (id: string) => {
+    if (!id) { setSelectedRecipientId(''); return }
+    const saved = savedRecipients.find(recipient => recipient.id === id)
+    if (!saved) { setSelectedRecipientId(''); return tell('error', 'That saved recipient is no longer available.') }
+    const hasCurrentDetails = Object.values(slip.recipient).some(value => value.trim() !== '')
+    if (hasCurrentDetails && !confirm('Replace the recipient details in this payment slip with the selected saved recipient?')) return
+    setSlip({ ...slip, recipient: { name: saved.name, role: saved.role, address: saved.address, email: saved.email, telephone: saved.telephone, identification: '' } })
+    setSelectedRecipientId(id)
+  }
+  const deleteRecipient = () => {
+    if (!selectedRecipientId || !confirm('Delete this saved recipient? The recipient details in this payment slip and existing drafts will remain unchanged.')) return
+    const next = savedRecipients.filter(recipient => recipient.id !== selectedRecipientId)
+    const result = saveStoredRecipients(localStorage, next)
+    if (!result.success) return tell('error', persistenceMessage(result, 'The saved recipient'))
+    setSavedRecipients(next); setSelectedRecipientId(''); tell('success', 'Saved recipient deleted. This payment slip was not changed.')
+  }
   const resetWorkflow = () => { setActiveStep('company'); setHighestStep(0); setAttemptedStep(null); setAttempted(false); setMobileView('edit') }
-  const acceptReplacement = (next: PaymentSlip) => { recordBackgroundPersistence(clearRecovery(localStorage)); cleanSlip.current = copySlip(next); setSlip(next); resetWorkflow() }
+  const acceptReplacement = (next: PaymentSlip) => { recordBackgroundPersistence(clearRecovery(localStorage)); cleanSlip.current = copySlip(next); setSlip(next); setSelectedRecipientId(''); resetWorkflow() }
   const destructiveReplacement = (message: string, createReplacement: () => PaymentSlip) => prepareDestructiveReplacement({ current: slip, baseline: cleanSlip.current, confirmDiscard: () => confirm(message), createReplacement })
   const loadDraft = () => { const draft = loadStoredDraft(localStorage, blank()); if (!draft) return tell('error', 'No valid saved draft was found on this device.'); const next = destructiveReplacement('Load the saved draft? Unsaved changes to this slip will be lost.', () => draft); if (!next) return; acceptReplacement(next); tell('success', 'Draft loaded.') }
   const clear = () => { const next = destructiveReplacement('Clear this payment slip? Unsaved information will be lost.', () => { const cleared = blank(); cleared.company = copySlip(slip).company; cleared.payment.reference = slip.payment.reference || currentOrNextReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }); return cleared }); if (!next) return; acceptReplacement(next); tell('success', 'Form cleared. Company details and payment reference were kept.') }
@@ -79,7 +107,7 @@ export default function App() {
     <main><section className="workspace-intro"><div><span className="eyebrow">DOCUMENT WORKSPACE</span><h1>Create a payment slip</h1><p>Complete four clear steps. Your information stays in place as you move between them.</p></div><div className="header-actions"><button className="button secondary" onClick={loadDraft}><FolderOpen /> Load draft</button><button className="button secondary" onClick={saveDraft}><Save /> Save draft</button><button className="button danger-subtle" onClick={clear}><RotateCcw /> Clear</button></div></section>
       <WorkflowStepper active={activeStep} highestIndex={highestStep} onSelect={selectStep} />
       <div className="mobile-view-switch" role="group" aria-label="Workspace view"><button type="button" className={mobileView === 'edit' ? 'active' : ''} aria-pressed={mobileView === 'edit'} onClick={() => setMobileView('edit')}>Edit</button><button type="button" className={mobileView === 'preview' ? 'active' : ''} aria-pressed={mobileView === 'preview'} onClick={showPreview}><Eye /> Preview</button></div>
-      <div className={`workspace mobile-${mobileView}`}><div className="form-pane">{activeStep === 'review' ? <ReviewPanel slip={slip} errors={allErrors} /> : <SlipForm slip={slip} errors={visibleErrors} step={activeStep} hasCompanyProfile={hasCompanyProfile} onChange={setSlip} onSubmit={nextStep} onReference={() => setSlip({ ...slip, payment: { ...slip.payment, reference: generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }) } })} onSaveCompany={saveCompany} onClearCompany={clearCompany} onLogoError={x => tell('error', x)} />}
+      <div className={`workspace mobile-${mobileView}`}><div className="form-pane">{activeStep === 'review' ? <ReviewPanel slip={slip} errors={allErrors} /> : <SlipForm slip={slip} errors={visibleErrors} step={activeStep} hasCompanyProfile={hasCompanyProfile} savedRecipients={savedRecipients} selectedRecipientId={selectedRecipientId} onChange={setSlip} onSubmit={nextStep} onReference={() => setSlip({ ...slip, payment: { ...slip.payment, reference: generateReference({ existingReferences: persistedReferences(), onPersistenceFailure: recordBackgroundPersistence }) } })} onSaveCompany={saveCompany} onClearCompany={clearCompany} onSelectRecipient={selectRecipient} onSaveRecipient={saveRecipient} onDeleteRecipient={deleteRecipient} onLogoError={x => tell('error', x)} />}
         <nav className="workflow-navigation" aria-label="Form step navigation"><button className="button secondary" type="button" onClick={previousStep} disabled={activeStep === 'company'}><ChevronLeft /> Back</button><span>Step {workflowSteps.findIndex(item => item.id === activeStep) + 1} of {workflowSteps.length}</span>{activeStep !== 'review' ? <button className="button primary" type="submit" form="payment-step-form">Continue <ChevronRight /></button> : <button className="button secondary" type="button" onClick={() => selectStep('payment')}><ChevronLeft /> Edit payment</button>}</nav>
         <section className="drive-card" hidden aria-hidden="true"><div className="drive-heading"><div className="drive-icon"><Cloud /></div><div><h2>Google Drive <span>Optional</span></h2><p>{!driveConfigured ? 'Setup required — add a Google OAuth Client ID to enable this feature.' : drive.connected ? 'Connected for this browser session.' : 'Create a Google Doc copy in a folder you choose.'}</p></div><span className={`status ${drive.connected ? 'connected' : ''}`}>{drive.connected ? 'Connected' : 'Not connected'}</span></div>
           {drive.folderName && <div className="folder-display"><HardDrive /> Saving to <strong>{drive.folderName}</strong></div>}
