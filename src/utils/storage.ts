@@ -1,4 +1,4 @@
-import type { Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
+import type { AppSettings, Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   recovery: 'payment-slip-recovery-v1',
   recipients: 'payment-slip-recipients',
   history: 'payment-slip-history',
+  settings: 'payment-slip-settings',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -158,7 +159,7 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
       method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Other'], defaults.payment.method),
       status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
-      adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], defaults.payment.currency),
+      adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], 'LKR'),
       sealText: text(payment.sealText, defaults.payment.sealText), paperSize: oneOf<PaperSize>(payment.paperSize, ['a4', 'a5', 'b5', 'letter'], defaults.payment.paperSize),
       orientation: oneOf<PageOrientation>(payment.orientation, ['portrait', 'landscape'], defaults.payment.orientation),
     },
@@ -220,14 +221,27 @@ export const clearRecovery = (storage: Storage, preserveUnknown = false) => {
   return safeRemove(storage, STORAGE_KEYS.recovery)
 }
 
-export const loadTheme = (storage: Storage): 'light' | 'dark' | null => {
+const loadLegacyTheme = (storage: Storage): 'light' | 'dark' | null => {
   const raw = safeGet(storage, STORAGE_KEYS.theme)
   const parsed = safeParse(raw)
   const value = parsed === null && (raw === 'light' || raw === 'dark') ? raw : unwrapCurrentOrLegacy(parsed)
   return value === 'light' || value === 'dark' ? value : null
 }
 
-export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => safeSet(storage, STORAGE_KEYS.theme, JSON.stringify(envelope(theme)))
+export const DEFAULT_SETTINGS: AppSettings = { theme: 'system', defaultCurrency: 'LKR', referencePrefix: 'PS' }
+export const normalizeReferencePrefix = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(value.trim()) && value.trim().length <= 12 ? value.trim().toUpperCase() : DEFAULT_SETTINGS.referencePrefix
+export const loadSettings = (storage: Storage): AppSettings => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.settings)))
+  if (value !== invalidVersion && isRecord(value)) return {
+    theme: oneOf(value.theme, ['system', 'light', 'dark'] as const, DEFAULT_SETTINGS.theme),
+    defaultCurrency: oneOf<CurrencyCode>(value.defaultCurrency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], DEFAULT_SETTINGS.defaultCurrency),
+    referencePrefix: normalizeReferencePrefix(value.referencePrefix),
+  }
+  return { ...DEFAULT_SETTINGS, theme: loadLegacyTheme(storage) ?? DEFAULT_SETTINGS.theme }
+}
+export const saveSettings = (storage: Storage, settings: AppSettings) => safeSet(storage, STORAGE_KEYS.settings, JSON.stringify(envelope(settings)))
+export const loadTheme = (storage: Storage): 'light' | 'dark' | null => { const theme = loadSettings(storage).theme; return theme === 'system' ? null : theme }
+export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => saveSettings(storage, { ...loadSettings(storage), theme })
 
 const REFERENCE_STATE_KEY = 'payment-slip-reference-state-v1'
 const ACTIVE_REFERENCE_KEY = 'payment-slip-active-reference'

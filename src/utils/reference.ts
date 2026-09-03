@@ -5,12 +5,13 @@ const ACTIVE_KEY = 'payment-slip-active-reference'
 const legacySequenceKey = (year: number) => `payment-slip-sequence-${year}`
 
 type ReferenceState = { version: 1; years: Record<string, { last: number; issued: string[] }> }
-type ReferenceOptions = { year?: number; storage?: Storage; session?: Storage; existingReferences?: string[]; onPersistenceFailure?: (result: PersistenceResult) => void }
+type ReferenceOptions = { year?: number; prefix?: string; storage?: Storage; session?: Storage; existingReferences?: string[]; onPersistenceFailure?: (result: PersistenceResult) => void }
 
-export const nextReference = (year: number, sequence: number) => `PS-${year}-${String(sequence).padStart(4, '0')}`
+const escapePattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+export const nextReference = (year: number, sequence: number, prefix = 'PS') => `${prefix}-${year}-${String(sequence).padStart(4, '0')}`
 
-export const parseReference = (reference: string) => {
-  const match = /^PS-(\d{4})-(\d+)$/.exec(reference.trim())
+export const parseReference = (reference: string, prefix = 'PS') => {
+  const match = new RegExp(`^${escapePattern(prefix)}-(\\d{4})-(\\d+)$`).exec(reference.trim())
   return match ? { year: Number(match[1]), sequence: Number(match[2]) } : null
 }
 
@@ -29,15 +30,15 @@ const readState = (storage: Storage): { state: ReferenceState; writable: boolean
 }
 
 export const reserveNextReference = (options: ReferenceOptions = {}) => {
-  const { year = new Date().getFullYear(), storage = localStorage, existingReferences = [] } = options
+  const { year = new Date().getFullYear(), prefix = 'PS', storage = localStorage, existingReferences = [] } = options
   const { state, writable } = readState(storage)
   const record = state.years[String(year)] || { last: 0, issued: [] }
   const known = new Set([...record.issued, ...existingReferences].map(value => value.trim()).filter(Boolean))
-  const knownSequences = [...known].map(parseReference).filter(value => value?.year === year).map(value => value!.sequence)
+  const knownSequences = [...known].map(reference => parseReference(reference, prefix)).filter(value => value?.year === year).map(value => value!.sequence)
   const legacySequence = Number(safeGet(storage, legacySequenceKey(year)) || 0)
   let sequence = Math.max(0, Number.isFinite(record.last) ? record.last : 0, Number.isFinite(legacySequence) ? legacySequence : 0, ...knownSequences) + 1
-  let reference = nextReference(year, sequence)
-  while (known.has(reference)) { sequence += 1; reference = nextReference(year, sequence) }
+  let reference = nextReference(year, sequence, prefix)
+  while (known.has(reference)) { sequence += 1; reference = nextReference(year, sequence, prefix) }
   state.years[String(year)] = { last: sequence, issued: [...new Set([...record.issued, reference])] }
   if (writable) {
     const persisted = safeSet(storage, STATE_KEY, JSON.stringify(state))
@@ -50,7 +51,7 @@ export const currentOrNextReference = (options: ReferenceOptions = {}) => {
   const year = options.year ?? new Date().getFullYear()
   const session = options.session ?? sessionStorage
   const active = safeGet(session, ACTIVE_KEY) || ''
-  if (parseReference(active)?.year === year) return active
+  if (parseReference(active, options.prefix)?.year === year) return active
   const reference = reserveNextReference({ ...options, year })
   const persisted = safeSet(session, ACTIVE_KEY, reference)
   if (!persisted.success) options.onPersistenceFailure?.(persisted)

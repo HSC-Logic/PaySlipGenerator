@@ -64,6 +64,5 @@ export const finalTotal = (items: PaymentItem[], adjustment: number | '', adjust
 }
 export const formatCurrency = (amount: number | '', currency: SupportedCurrency = 'LKR') => {
   const config = currencies[currency] || currencies.LKR
-  const value = new Intl.NumberFormat(config.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(amount || 0))
-  return `${config.symbol} ${value}`
+  return new Intl.NumberFormat(config.locale, { style: 'currency', currency, currencyDisplay: 'symbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }).formatToParts(Number(amount || 0)).map(part => part.type === 'currency' ? config.symbol : part.value).join('')
 }

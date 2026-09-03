@@ -13,6 +13,8 @@ class MemoryStorage implements Storage {
 
 describe('payment references', () => {
   it('uses the PS year format and four-digit padding', () => { expect(nextReference(2026, 1)).toBe('PS-2026-0001'); expect(nextReference(2026, 120)).toBe('PS-2026-0120') })
+  it('uses a configured prefix for future references and parsing', () => { expect(nextReference(2026, 42, 'INV')).toBe('INV-2026-0042'); expect(parseReference('INV-2026-0042', 'INV')).toEqual({ year: 2026, sequence: 42 }); expect(parseReference('PS-2026-0042', 'INV')).toBeNull() })
+  it('reserves custom-prefix references without rewriting existing references', () => { const storage = new MemoryStorage(); expect(reserveNextReference({ year: 2026, prefix: 'PAY', storage, existingReferences: ['PS-2026-0099', 'PAY-2026-0002'] })).toBe('PAY-2026-0003') })
   it('starts at one and persists the next sequence', () => { const storage = new MemoryStorage(); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001'); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0002') })
   it('continues from the legacy counter and a higher persisted draft reference', () => { const storage = new MemoryStorage(); storage.setItem('payment-slip-sequence-2026', '8'); expect(reserveNextReference({ year: 2026, storage, existingReferences: ['PS-2026-0042', 'PAY-2026-0100'] })).toBe('PS-2026-0043') })
   it('does not reuse issued references and starts a new sequence each year', () => { const storage = new MemoryStorage(); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0001'); expect(reserveNextReference({ year: 2027, storage })).toBe('PS-2027-0001'); expect(reserveNextReference({ year: 2026, storage })).toBe('PS-2026-0002') })

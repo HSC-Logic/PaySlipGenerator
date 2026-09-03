@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearReferenceData, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveTheme, STORAGE_KEYS } from './storage'
+import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearReferenceData, DEFAULT_SETTINGS, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadSettings, loadTheme, normalizeReferencePrefix, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveSettings, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -36,7 +36,7 @@ describe('safe persisted data loading', () => {
     saveTheme(storage, 'dark')
     expect(JSON.parse(storage.getItem(STORAGE_KEYS.company)!)).toEqual({ version: 1, data: slip.company })
     expect(JSON.parse(storage.getItem(STORAGE_KEYS.draft)!)).toEqual({ version: 1, data: slip })
-    expect(JSON.parse(storage.getItem(STORAGE_KEYS.theme)!)).toEqual({ version: 1, data: 'dark' })
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.settings)!)).toEqual({ version: 1, data: { ...DEFAULT_SETTINGS, theme: 'dark' } })
     expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('dark')
@@ -51,6 +51,39 @@ describe('safe persisted data loading', () => {
     expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('light')
+  })
+
+  it('loads safe settings defaults and migrates the legacy theme key', () => {
+    const storage = new MemoryStorage()
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+    storage.setItem(STORAGE_KEYS.theme, JSON.stringify({ version: 1, data: 'dark' }))
+    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, theme: 'dark' })
+  })
+
+  it('round-trips one coherent settings envelope and normalizes reference prefixes', () => {
+    const storage = new MemoryStorage()
+    const settings = { theme: 'light' as const, defaultCurrency: 'EUR' as const, referencePrefix: 'INV-LK' }
+    expect(saveSettings(storage, settings).success).toBe(true)
+    expect(loadSettings(storage)).toEqual(settings)
+    expect(normalizeReferencePrefix(' pay-lk ')).toBe('PAY-LK')
+    expect(normalizeReferencePrefix('bad prefix!')).toBe('PS')
+  })
+
+  it('falls back field-by-field for corrupt settings', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.settings, JSON.stringify({ version: 1, data: { theme: 'neon', defaultCurrency: 'BTC', referencePrefix: 'bad prefix' } }))
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+    storage.setItem(STORAGE_KEYS.settings, '{broken')
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('does not reinterpret currency already stored in payment records', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    slip.payment.currency = 'USD'
+    saveDraft(storage, slip)
+    saveSettings(storage, { ...DEFAULT_SETTINGS, defaultCurrency: 'EUR' })
+    expect(loadDraft(storage, createBasicSlip())?.payment.currency).toBe('USD')
   })
 
   it('rejects unknown persistence versions without treating envelope data as legacy', () => {
@@ -169,7 +202,7 @@ describe('safe persisted data loading', () => {
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('dark')
     storage.setItem(STORAGE_KEYS.theme, 'unknown')
-    expect(loadTheme(storage)).toBeNull()
+    expect(loadTheme(storage)).toBe('dark')
   })
 
   it('distinguishes a missing profile from a valid returning-user profile', () => {

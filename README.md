@@ -97,7 +97,17 @@ The application lists folders that the granted `drive.file` scope makes availabl
 
 ### Payment reference persistence
 
-Each new payment reserves the next browser-local reference in the form `PS-2026-0001`. The yearly counter and issued-reference list are stored in `localStorage`; the active reference is also held in `sessionStorage` so refreshing the same tab does not consume another number. “Another slip” and the generate-reference button explicitly reserve the next number. Manual edits are preserved in the payment and in saved drafts. Existing legacy yearly counters and higher `PS-…` references found in the saved draft are used when choosing the next sequence.
+Each new payment reserves the next browser-local reference in the form `PS-2026-0001`. The `PS` prefix can be changed in Settings for future references. The yearly counter and issued-reference list are stored in `localStorage`; the active reference is also held in `sessionStorage` so refreshing the same tab does not consume another number. “Another slip” and the generate-reference button explicitly reserve the next number. Manual edits and existing historical references are preserved. Existing legacy yearly counters and higher matching-prefix references found in stored data are used when choosing the next sequence.
+
+### Settings
+
+Settings use one versioned `payment-slip-settings` record with these defaults:
+
+- `theme`: `system`
+- `defaultCurrency`: `LKR`
+- `referencePrefix`: `PS`
+
+The former standalone theme key is read as a legacy fallback but new preference changes are written only to the unified settings record. Invalid settings fall back field-by-field. Default currency applies only when a new blank payment is created; saved drafts and history keep their own currency. Reference-prefix changes apply only when a future reference is generated and never rewrite existing references. Currency rendering uses `Intl.NumberFormat` with each currency's configured locale and an unambiguous display symbol.
 
 ### Line items and legacy drafts
 
