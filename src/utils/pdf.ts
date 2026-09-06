@@ -43,7 +43,7 @@ const splitLines = (doc: jsPDF, value: string, width: number) => value.split(/\r
 const lineBlockHeight = (lines: string[], lineHeight: number) => Math.max(1, lines.length) * lineHeight
 export const getPdfTableColumnWidths = (contentWidth: number) => [contentWidth * 0.05, contentWidth * 0.5, contentWidth * 0.09, contentWidth * 0.17, contentWidth * 0.19]
 
-export function buildPdf(slip: PaymentSlip) {
+export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } = {}) {
   const view = buildPaymentSlipView(slip)
   const orientation = slip.payment.orientation || 'portrait'
   const doc = new jsPDF({ unit: 'mm', format: slip.payment.paperSize || 'a4', orientation })
@@ -166,7 +166,7 @@ export function buildPdf(slip: PaymentSlip) {
   const pages = doc.getNumberOfPages()
   for (let page = 1; page <= pages; page += 1) {
     const footerY = getPdfFooterBaseline(layout)
-    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated with Sliply', marginX, footerY); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, footerY - (referenceLines.length - 1) * bodyLine, { align: 'right' })
+    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); if (options.showBranding !== false) doc.text('Generated with Sliply', marginX, footerY); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, footerY - (referenceLines.length - 1) * bodyLine, { align: 'right' })
   }
   return doc
 }

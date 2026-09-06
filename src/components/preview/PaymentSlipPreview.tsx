@@ -4,7 +4,7 @@ import { buildPaymentSlipView } from '../../utils/paymentSlipView'
 
 const Meta = ({ label, value }: { label: string; value?: string }) => value ? <div><span>{label}</span><strong>{value}</strong></div> : null
 
-export function PaymentSlipPreview({ slip }: { slip: PaymentSlip }) {
+export function PaymentSlipPreview({ slip, showBranding = true }: { slip: PaymentSlip; showBranding?: boolean }) {
   const view = useMemo(() => buildPaymentSlipView(slip), [slip])
   return <article className={`slip ${view.payment.orientation}`} id="payment-slip" aria-label="Payment slip preview" style={{ '--document-color': view.themeColor, aspectRatio: `${view.page.width} / ${view.page.height}` } as CSSProperties}>
     <div className="slip-topline" />
@@ -22,6 +22,6 @@ export function PaymentSlipPreview({ slip }: { slip: PaymentSlip }) {
     <p className="acknowledgement">I acknowledge receipt of the payment stated above.</p>
     <section className="signatures"><div><span>{view.company.authorizedName}</span><i /><strong>Prepared By</strong>{view.company.authorizedDesignation && <small>{view.company.authorizedDesignation}</small>}</div><div><span>&nbsp;</span><i /><strong>Recipient Signature</strong></div><div><span>&nbsp;</span><i /><strong>Signature Date</strong></div></section>
     {view.payment.sealText && <div className="document-seal">{view.payment.sealText}</div>}
-    <footer><span className="sliply-attribution">Generated with Sliply</span><strong>{view.payment.rawReference}</strong></footer>
+    <footer>{showBranding ? <span className="sliply-attribution">Generated with Sliply</span> : <span />}<strong>{view.payment.rawReference}</strong></footer>
   </article>
 }

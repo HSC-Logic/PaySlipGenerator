@@ -25,6 +25,11 @@ describe('PDF document generation', () => {
     expect(pdfFilename(slip)).toBe('Payment-Slip-PAY-001-A-Recipient-Accounts.pdf')
   })
 
+  it('applies the effective Free or Pro branding choice without changing the renderer', () => {
+    expect(buildPdf(createBasicSlip(), { showBranding: false }).output()).not.toContain('Generated with Sliply')
+    expect(buildPdf(createBasicSlip(), { showBranding: true }).output()).toContain('Generated with Sliply')
+  })
+
   describe('page dimensions and geometry', () => {
     it.each(formats)('uses correct %s %s dimensions', (paperSize, orientation, width, height) => {
       const slip = createBasicSlip(); slip.payment.paperSize = paperSize; slip.payment.orientation = orientation

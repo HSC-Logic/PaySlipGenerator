@@ -17,6 +17,10 @@ export type AdjustmentMode = 'percentage' | 'fixed'
 export interface TotalAdjustment { id: string; label: string; kind: AdjustmentKind; mode: AdjustmentMode; value: number | '' }
 export interface PaymentSlip { company: Company; recipient: Recipient; payment: Payment; items: PaymentItem[]; adjustments: TotalAdjustment[] }
 export interface PaymentRecord { id: string; createdAt: number; updatedAt: number; slip: PaymentSlip }
+export interface CloudCompany extends Company { id: string; referencePrefix: string; defaultCurrency: CurrencyCode; defaultPaperSize: PaperSize; defaultOrientation: PageOrientation; showSliplyBranding: boolean; isDefault: boolean; archivedAt: string | null }
+export interface CloudRecipient extends Recipient { id: string; archivedAt: string | null }
+export interface PaymentSlipFilters { query?: string; status?: PaymentStatus | ''; companyId?: string; recipientId?: string; currency?: CurrencyCode | ''; dateFrom?: string; dateTo?: string; sort?: 'newest' | 'oldest' | 'amount' }
+export interface CloudPaymentRecord extends PaymentRecord { companyId: string; recipientId: string | null; archivedAt: string | null }
 export interface GoogleDriveState { connected: boolean; folderId: string; folderName: string; documentUrl: string }
 export type Errors = Record<string, string>
 export type WorkflowStep = 'company' | 'recipient' | 'payment' | 'review'

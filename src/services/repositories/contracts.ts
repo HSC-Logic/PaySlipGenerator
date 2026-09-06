@@ -1,0 +1,4 @@
+import type { CloudCompany, CloudPaymentRecord, CloudRecipient, PaymentSlip, PaymentSlipFilters } from '../../types'
+export interface CompanyRepository { list(): Promise<CloudCompany[]>; save(company: CloudCompany): Promise<CloudCompany>; archive(id: string): Promise<void> }
+export interface RecipientRepository { list(): Promise<CloudRecipient[]>; save(recipient: CloudRecipient): Promise<CloudRecipient>; archive(id: string): Promise<void> }
+export interface PaymentSlipRepository { list(filters?: PaymentSlipFilters): Promise<CloudPaymentRecord[]>; get(id: string): Promise<CloudPaymentRecord | null>; create(slip: PaymentSlip, companyId: string, recipientId?: string): Promise<CloudPaymentRecord>; update(id: string, slip: PaymentSlip, companyId: string, recipientId?: string): Promise<CloudPaymentRecord>; remove(id: string): Promise<void>; nextReference(companyId: string): Promise<string> }
