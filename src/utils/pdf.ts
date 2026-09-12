@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { PaymentSlip } from '../types'
 import { buildPaymentSlipView } from './paymentSlipView'
+import { getDocumentTypeLabel, safeFilenameSlug } from './documentIdentity'
 
 type PaymentSlipView = ReturnType<typeof buildPaymentSlipView>
 export type PdfPageMetrics = {
@@ -19,10 +20,9 @@ export type PdfPageMetrics = {
   orientation: 'portrait' | 'landscape'
 }
 
-const safeName = (value: string) => value.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Recipient'
 const hexToRgb = (hex: string): [number, number, number] => { const clean = /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : '0b1f3a'; return [Number.parseInt(clean.slice(0, 2), 16), Number.parseInt(clean.slice(2, 4), 16), Number.parseInt(clean.slice(4, 6), 16)] }
 const addContainedLogo = (doc: jsPDF, data: string, format: 'PNG' | 'JPEG', x: number, y: number, box: number) => { const properties = doc.getImageProperties(data); const ratio = properties.width / properties.height; const width = ratio >= 1 ? box : box * ratio; const height = ratio >= 1 ? box / ratio : box; doc.addImage(data, format, x + (box - width) / 2, y + (box - height) / 2, width, height, undefined, 'FAST') }
-export const pdfFilename = (slip: PaymentSlip) => `Payment-Slip-${safeName(slip.payment.reference)}-${safeName(slip.recipient.name)}.pdf`
+export const pdfFilename = (slip: PaymentSlip) => `${safeFilenameSlug(getDocumentTypeLabel(slip))}-${safeFilenameSlug(slip.payment.reference, false)}.pdf`
 
 export function getPdfPageMetrics(doc: jsPDF, orientation: PdfPageMetrics['orientation']): PdfPageMetrics {
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -80,8 +80,14 @@ export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(compact ? 6.2 : 7.5); doc.setTextColor(...muted)
   const companyDetails = [view.company.address, view.company.contacts.replace('·', '|'), view.company.registration].filter(Boolean).flatMap(value => splitLines(doc, value, companyTextWidth))
   if (companyDetails.length) { doc.text(companyDetails, companyX, companyY); companyY += lineBlockHeight(companyDetails, compact ? 3.1 : 3.8) }
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 8 : 11); doc.setTextColor(...navy); doc.text('PAYMENT', pageWidth - marginX, y + 4, { align: 'right' }); doc.setFontSize(compact ? 17 : 24); doc.text('SLIP', pageWidth - marginX, y + (compact ? 14 : 17), { align: 'right' })
-  y = Math.max(companyY, y + logoSize, y + (compact ? 18 : 24)) + sectionGap
+  const headingWidth = contentWidth - companyWidth - 4
+  const headingSize = view.payment.documentHeading.length > 24 ? (compact ? 8 : 12) : (compact ? 14 : 20)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(headingSize); doc.setTextColor(...navy)
+  const headingLines = splitLines(doc, view.payment.documentHeading, headingWidth)
+  const headingLine = headingSize * 0.38
+  doc.text(headingLines, pageWidth - marginX, y + headingLine, { align: 'right' })
+  const headingBottom = y + lineBlockHeight(headingLines, headingLine)
+  y = Math.max(companyY, y + logoSize, headingBottom) + sectionGap
   doc.setDrawColor(215, 222, 230); doc.line(marginX, y, pageWidth - marginX, y); y += sectionGap
 
   const recipientWidth = landscape ? contentWidth * 0.43 : contentWidth * 0.58
@@ -140,7 +146,7 @@ export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } 
       const pageLines = lines.slice(0, capacity); lines = lines.slice(capacity)
       drawLabel(`${label}${continued ? ' (CONTINUED)' : ''}`, marginX, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(pageLines, marginX, y + bodyLine)
       y += bodyLine + lineBlockHeight(pageLines, bodyLine) + sectionGap
-      if (lines.length) { y = addContinuationPage('PAYMENT SLIP - CONTINUED'); continued = true }
+      if (lines.length) { y = addContinuationPage(`${view.payment.documentHeading} - CONTINUED`); continued = true }
     }
   }
   flowSection('BANK', view.payment.bankName)

@@ -13,6 +13,8 @@ export const validateSlip = (slip: PaymentSlip): Errors => {
   if (!slip.payment.date || Number.isNaN(Date.parse(slip.payment.date))) e['payment.date'] = 'A valid payment date is required.'
   if (!slip.payment.reference.trim()) e['payment.reference'] = 'Payment reference is required.'
   if (!slip.payment.title.trim()) e['payment.title'] = 'Payment purpose is required.'
+  if (slip.payment.documentType === 'other' && !slip.payment.customDocumentType?.trim()) e['payment.customDocumentType'] = 'Enter a document type.'
+  if (slip.payment.method === 'Other' && !slip.payment.customPaymentMethod?.trim()) e['payment.customPaymentMethod'] = 'Enter the payment method.'
   if (slip.payment.status === 'paid' && slip.payment.paidDate && Number.isNaN(Date.parse(slip.payment.paidDate))) e['payment.paidDate'] = 'Enter a valid paid date or leave it empty.'
   slip.items.forEach((item, i) => {
     if (!item.description.trim()) e[`items.${i}.description`] = 'Description is required.'

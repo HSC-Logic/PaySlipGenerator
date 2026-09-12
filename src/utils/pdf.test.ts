@@ -21,8 +21,20 @@ describe('PDF document generation', () => {
 
   it('creates a filesystem-safe, meaningful filename', () => {
     const slip = createBasicSlip()
-    slip.recipient.name = 'A Recipient / Accounts'
-    expect(pdfFilename(slip)).toBe('Payment-Slip-PAY-001-A-Recipient-Accounts.pdf')
+    slip.payment.documentType = 'other'
+    slip.payment.customDocumentType = 'Service / Estimate'
+    expect(pdfFilename(slip)).toBe('service-estimate-PAY-001.pdf')
+  })
+
+  it('renders the selected document heading and resolved custom payment method', () => {
+    const slip = createBasicSlip()
+    slip.payment.documentType = 'invoice'
+    slip.payment.method = 'Other'
+    slip.payment.customPaymentMethod = 'Wise Business'
+    const output = buildPdf(slip).output()
+    expect(output).toContain('INVOICE')
+    expect(output).toContain('Wise Business')
+    expect(output).not.toContain('PAYMENT SLIP')
   })
 
   it('applies the effective Free or Pro branding choice without changing the renderer', () => {

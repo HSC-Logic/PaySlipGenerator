@@ -6,11 +6,11 @@ const Meta = ({ label, value }: { label: string; value?: string }) => value ? <d
 
 export function PaymentSlipPreview({ slip, showBranding = true }: { slip: PaymentSlip; showBranding?: boolean }) {
   const view = useMemo(() => buildPaymentSlipView(slip), [slip])
-  return <article className={`slip ${view.payment.orientation}`} id="payment-slip" aria-label="Payment slip preview" style={{ '--document-color': view.themeColor, aspectRatio: `${view.page.width} / ${view.page.height}` } as CSSProperties}>
+  return <article className={`slip ${view.payment.orientation}`} id="payment-slip" aria-label={`${view.payment.documentLabel || 'Document'} preview`} style={{ '--document-color': view.themeColor, aspectRatio: `${view.page.width} / ${view.page.height}` } as CSSProperties}>
     <div className="slip-topline" />
     <header className="slip-header">
       <div className="brand-lockup">{view.company.logo ? <img src={view.company.logo} alt="Company logo" /> : <div className="logo-placeholder">{view.company.initials}</div>}<div><h1>{view.company.name}</h1><p>{view.company.address}</p>{view.company.contacts && <p>{view.company.contacts}</p>}{view.company.registration && <p>{view.company.registration}</p>}</div></div>
-      <div className="document-title"><span>PAYMENT</span><strong>SLIP</strong></div>
+      <div className="document-title"><strong>{view.payment.documentHeading}</strong></div>
     </header>
     <div className="slip-rule" />
     <section className="document-meta"><div><span>PAYMENT TO</span><h2>{view.recipient.name}</h2>{view.recipient.details.map(detail => <p key={detail}>{detail}</p>)}</div><div className="meta-grid"><Meta label="REFERENCE" value={view.payment.reference} /><Meta label="PAYMENT DATE" value={view.payment.date} /><Meta label="PAYMENT METHOD" value={view.payment.method} /></div></section>

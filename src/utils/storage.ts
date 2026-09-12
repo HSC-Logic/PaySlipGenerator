@@ -1,4 +1,4 @@
-import type { AppSettings, Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
+import type { AppSettings, Company, CompanyProfile, CurrencyCode, DocumentType, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
@@ -155,8 +155,9 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
       address: text(recipient.address, defaults.recipient.address), email: text(recipient.email, defaults.recipient.email), telephone: text(recipient.telephone, defaults.recipient.telephone),
     },
     payment: {
+      documentType: oneOf<DocumentType>(payment.documentType, ['payment-slip', 'invoice', 'quotation', 'other'], 'payment-slip'), customDocumentType: text(payment.customDocumentType, ''),
       date: text(payment.date, defaults.payment.date), reference: text(payment.reference, defaults.payment.reference), title: text(payment.title, defaults.payment.title),
-      method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Other'], defaults.payment.method),
+      method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Online Payment', 'Other'], defaults.payment.method), customPaymentMethod: text(payment.customPaymentMethod, ''),
       status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
       adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], 'LKR'),
