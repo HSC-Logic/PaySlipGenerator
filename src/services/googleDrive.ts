@@ -2,6 +2,7 @@ import type { PaymentSlip } from '../types'
 import { calculatePaymentTotals, currencies, formatCurrency } from '../utils/currency'
 import { numberToWords } from '../utils/amountInWords'
 import { getDocumentHeading, getDocumentTypeLabel, getPaymentMethodLabel } from '../utils/documentIdentity'
+import { createPdfBlob, pdfFilename } from '../utils/pdf'
 
 declare global { interface Window { google?: { accounts: { oauth2: { initTokenClient(config: Record<string, unknown>): { requestAccessToken(options?: Record<string, unknown>): void }, revoke(token: string, callback: () => void): void } } } } }
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
@@ -30,7 +31,10 @@ const api = async (url: string, init: RequestInit = {}) => {
 export async function chooseFolder() {
   const data = await api("https://www.googleapis.com/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'%20and%20trashed%3Dfalse&fields=files(id,name)&orderBy=name&pageSize=100")
   const folders = data.files as { id: string; name: string }[]
-  if (!folders.length) throw new Error('No Google Drive folders are available. Create one in Drive first.')
+  if (!folders.length) {
+    const folder = await api('https://www.googleapis.com/drive/v3/files?fields=id,name', { method: 'POST', body: JSON.stringify({ name: 'Sliply', mimeType: 'application/vnd.google-apps.folder' }) })
+    return { id: folder.id as string, name: folder.name as string }
+  }
   const choice = window.prompt(`Enter a folder number:\n${folders.map((f, i) => `${i + 1}. ${f.name}`).join('\n')}`, '1')
   if (choice === null) throw new Error('Folder selection was cancelled.')
   const folder = folders[Number(choice) - 1]; if (!folder) throw new Error('Please enter a valid folder number.')
@@ -45,5 +49,24 @@ export async function createGoogleDoc(slip: PaymentSlip, folderId: string) {
   const lines = [slip.company.name, slip.company.address, '', getDocumentHeading(slip), `Reference: ${slip.payment.reference}`, `Date: ${slip.payment.date}`, '', `Payment to: ${slip.recipient.name}`, `Role: ${slip.recipient.role}`, slip.recipient.identification ? `NIC / ID: ${slip.recipient.identification}` : '', `Purpose: ${slip.payment.title}`, '', ...slip.items.map((x, i) => `${i + 1}. ${x.description} — ${x.quantity} × ${formatCurrency(x.rate, slip.payment.currency)} = ${formatCurrency(calculation.itemAmounts[i], slip.payment.currency)}`), '', `Subtotal: ${formatCurrency(base, slip.payment.currency)}`, ...slip.adjustments.map((entry, index) => `${entry.label}${entry.mode === 'percentage' ? ` (${entry.value || 0}%)` : ''}: ${formatCurrency(calculation.adjustmentAmounts[index], slip.payment.currency)}`), `Final amount: ${formatCurrency(total, slip.payment.currency)}`, numberToWords(total, currency.major, currency.minor), `Payment method: ${getPaymentMethodLabel(slip)}`, slip.payment.bankName ? `Bank: ${slip.payment.bankName}` : '', slip.payment.transactionReference ? `Transaction reference: ${slip.payment.transactionReference}` : '', slip.payment.notes ? `Notes: ${slip.payment.notes}` : '', slip.payment.sealText ? `Seal: ${slip.payment.sealText}` : '', '', 'I acknowledge receipt of the payment stated above.', '', 'Prepared By: ____________________    Recipient Signature: ____________________    Date: __________'].filter(Boolean).join('\n')
   await api(`https://docs.googleapis.com/v1/documents/${file.id}:batchUpdate`, { method: 'POST', body: JSON.stringify({ requests: [{ insertText: { location: { index: 1 }, text: lines } }] }) })
   return { id: file.id as string, url: `https://docs.google.com/document/d/${file.id}/edit` }
+}
+export async function uploadPdfToDrive(slip: PaymentSlip, folderId: string) {
+  if (!accessToken) throw new Error('Connect Google Drive first.')
+  const boundary = `sliply_${crypto.randomUUID().replaceAll('-', '')}`
+  const metadata = JSON.stringify({ name: pdfFilename(slip), mimeType: 'application/pdf', parents: folderId ? [folderId] : undefined })
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
+    `--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`,
+    createPdfBlob(slip),
+    `\r\n--${boundary}--`,
+  ], { type: `multipart/related; boundary=${boundary}` })
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  })
+  if (!response.ok) throw new Error((await response.json()).error?.message || 'PDF upload to Google Drive failed.')
+  const file = await response.json()
+  return { id: file.id as string, name: file.name as string, url: file.webViewLink as string }
 }
 export const disconnectDrive = () => { if (accessToken && window.google) window.google.accounts.oauth2.revoke(accessToken, () => undefined); accessToken = '' }

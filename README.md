@@ -22,7 +22,7 @@ See [architecture](docs/architecture.md), [Supabase setup](docs/supabase-setup.m
 - Browser-local saved company profile, reusable recipients, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
 - Searchable browser-local payment history with snapshot editing and duplication
 - Field-level validation, accessible labels, notices, and loading states
-- Optional, session-only Google Drive OAuth and Google Docs creation
+- Optional, session-only Google Drive OAuth, PDF upload, and Google Docs creation
 - Automated calculation/reference tests and GitHub Pages deployment workflow
 
 ## Local development
@@ -86,14 +86,14 @@ The integration requests only `drive.file`, which limits access to files created
 
 ### Folder selection note
 
-The application lists folders that the granted `drive.file` scope makes available and asks the user to select one. Under this minimum-privilege scope, Google may only expose folders the app has created or that the user has explicitly opened with the app. If no folder is visible, create or expose a folder to the app first. A broader all-Drive scope is intentionally not requested.
+The application lists folders that the granted `drive.file` scope makes available and asks the user to select one. Under this minimum-privilege scope, Google may only expose folders the app has created or that the user has explicitly opened with the app. On first use, if no folder is available, Sliply creates a dedicated `Sliply` folder automatically. A broader all-Drive scope is intentionally not requested.
 
 ## Privacy and security
 
 - Payment information, NIC/ID details, company profiles, drafts, recovery snapshots, and explicit history snapshots are stored in the browser's localStorage. Reusable saved-recipient records deliberately exclude NIC/ID; NIC/ID remains only where needed to preserve a draft, recovery snapshot, or historical payment. The active generated reference is kept in sessionStorage.
 - There is no analytics, advertising, behavioral tracking, application backend, or database.
 - The interface loads DM Sans and Manrope from Google Fonts when the page opens. As with any external web resource, that request exposes ordinary connection metadata such as the user's IP address and browser headers to the resource provider; it does not include the payment form contents.
-- The optional Google integration connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Create Google Doc** sends the payment reference in the file title and sends the document's textual payment content to Google Drive and Docs for storage in the user's selected folder. It does not upload the logo.
+- The optional Google integration connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Save PDF to Drive** uploads the exact PDF produced by the shared Download/Print renderer, including its embedded logo when present. **Create Google Doc** sends the payment reference in the file title and the document's textual payment content to Google Drive and Docs for storage in the selected folder.
 - OAuth access tokens are held in memory for the current page session only.
 - Local browser data is not encrypted; avoid using a shared browser profile for sensitive records and clear site data when appropriate.
 - Uploaded logos are limited to image files smaller than 2 MB. Logos are stored as Base64 data, which adds roughly one-third to the source file size; because a logo may also be present in the company profile, explicit draft, and recovery snapshots, large logos can approach browser storage quotas. The application reports quota failures without changing image quality or discarding the in-memory form.
