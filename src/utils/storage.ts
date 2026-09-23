@@ -1,10 +1,13 @@
-import type { Company, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentSlip, TotalAdjustment } from '../types'
+import type { AppSettings, Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
   company: 'payment-slip-company',
   draft: 'payment-slip-draft',
   theme: 'payment-slip-theme',
   recovery: 'payment-slip-recovery-v1',
+  recipients: 'payment-slip-recipients',
+  history: 'payment-slip-history',
+  settings: 'payment-slip-settings',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -45,6 +48,7 @@ export const persistenceMessage = (result: PersistenceResult, subject: string) =
 }
 
 const text = (value: unknown, fallback: string) => typeof value === 'string' ? value : fallback
+const persistedLogo = (value: unknown, fallback: string) => typeof value === 'string' && (value === '' || value.startsWith('data:image/')) ? value : fallback
 const numeric = (value: unknown, fallback: number | ''): number | '' => value === '' || (typeof value === 'number' && Number.isFinite(value)) ? value : fallback
 const oneOf = <T extends string>(value: unknown, values: readonly T[], fallback: T): T => typeof value === 'string' && values.includes(value as T) ? value as T : fallback
 const VERSION = 1 as const
@@ -59,18 +63,47 @@ const companyFrom = (value: unknown, fallback: Company): Company | null => {
   if (!isRecord(value)) return null
   return {
     name: text(value.name, fallback.name), address: text(value.address, fallback.address), telephone: text(value.telephone, fallback.telephone),
-    email: text(value.email, fallback.email), registrationNumber: text(value.registrationNumber, fallback.registrationNumber), logo: text(value.logo, fallback.logo),
+    email: text(value.email, fallback.email), registrationNumber: text(value.registrationNumber, fallback.registrationNumber), logo: persistedLogo(value.logo, fallback.logo),
     authorizedName: text(value.authorizedName, fallback.authorizedName), authorizedDesignation: text(value.authorizedDesignation, fallback.authorizedDesignation),
     themeColor: text(value.themeColor, fallback.themeColor),
   }
 }
 
-export const loadCompany = (storage: Storage, fallback: Company): Company => {
+export const loadCompanyProfile = (storage: Storage, fallback: Company): CompanyProfile | null => {
   const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.company)))
-  return value === invalidVersion ? { ...fallback } : companyFrom(value, fallback) ?? { ...fallback }
+  return value === invalidVersion ? null : companyFrom(value, fallback)
 }
 
-export const saveCompany = (storage: Storage, company: Company) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
+export const loadCompany = (storage: Storage, fallback: Company): Company => loadCompanyProfile(storage, fallback) ?? { ...fallback }
+
+export const saveCompany = (storage: Storage, company: CompanyProfile) => safeSet(storage, STORAGE_KEYS.company, JSON.stringify(envelope(company)))
+export const clearCompanyProfile = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.company)
+
+const savedRecipientFrom = (value: unknown): SavedRecipient | null => {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id || typeof value.name !== 'string' || !value.name.trim()) return null
+  return {
+    id: value.id,
+    name: value.name,
+    role: text(value.role, ''),
+    address: text(value.address, ''),
+    email: text(value.email, ''),
+    telephone: text(value.telephone, ''),
+  }
+}
+
+export const loadRecipients = (storage: Storage): SavedRecipient[] => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.recipients)))
+  if (value === invalidVersion || !Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap(item => {
+    const recipient = savedRecipientFrom(item)
+    if (!recipient || seen.has(recipient.id)) return []
+    seen.add(recipient.id)
+    return [recipient]
+  })
+}
+
+export const saveRecipients = (storage: Storage, recipients: SavedRecipient[]) => safeSet(storage, STORAGE_KEYS.recipients, JSON.stringify(envelope(recipients)))
 
 const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
   if (!isRecord(value) || typeof value.id !== 'string' || typeof value.label !== 'string') return null
@@ -87,10 +120,19 @@ const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
  * still have the expected runtime shape before a draft is accepted.
  */
 const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
-  if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment) || !Array.isArray(value.items)) return null
+  if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment)) return null
   const company = companyFrom(value.company, defaults.company)
   if (!company) return null
-  const items = value.items.map((item, index) => {
+  const legacyDescription = typeof value.description === 'string' ? value.description : typeof value.payment.description === 'string' ? value.payment.description : null
+  const legacyAmountValue = value.amount ?? value.payment.amount
+  const legacyAmount = typeof legacyAmountValue === 'number' && Number.isFinite(legacyAmountValue) ? legacyAmountValue : typeof legacyAmountValue === 'string' && legacyAmountValue.trim() && Number.isFinite(Number(legacyAmountValue)) ? Number(legacyAmountValue) : null
+  const sourceItems: unknown[] | null = Array.isArray(value.items)
+    ? value.items
+    : legacyDescription !== null && legacyAmount !== null
+      ? [{ id: defaults.items[0]?.id ?? 'legacy-item-1', description: legacyDescription, quantity: 1, rate: legacyAmount }]
+      : null
+  if (!sourceItems) return null
+  const items = sourceItems.map((item, index) => {
     if (!isRecord(item) || typeof item.description !== 'string') return null
     return {
       id: text(item.id, `${defaults.items[0]?.id ?? 'item'}-${index + 1}`),
@@ -115,8 +157,9 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
     payment: {
       date: text(payment.date, defaults.payment.date), reference: text(payment.reference, defaults.payment.reference), title: text(payment.title, defaults.payment.title),
       method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Other'], defaults.payment.method),
+      status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
-      adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], defaults.payment.currency),
+      adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], 'LKR'),
       sealText: text(payment.sealText, defaults.payment.sealText), paperSize: oneOf<PaperSize>(payment.paperSize, ['a4', 'a5', 'b5', 'letter'], defaults.payment.paperSize),
       orientation: oneOf<PageOrientation>(payment.orientation, ['portrait', 'landscape'], defaults.payment.orientation),
     },
@@ -131,6 +174,32 @@ export const loadDraft = (storage: Storage, defaults: PaymentSlip): PaymentSlip 
 }
 
 export const saveDraft = (storage: Storage, slip: PaymentSlip) => safeSet(storage, STORAGE_KEYS.draft, JSON.stringify(envelope(slip)))
+
+const stableLegacyId = (slip: PaymentSlip, index: number) => {
+  const source = `${slip.payment.reference}|${slip.payment.date}|${slip.recipient.name}|${index}`
+  let hash = 2166136261
+  for (const character of source) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
+  return `legacy-${(hash >>> 0).toString(36)}`
+}
+
+export const loadHistory = (storage: Storage, defaults: PaymentSlip): PaymentRecord[] => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.history)))
+  if (value === invalidVersion || !Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.flatMap((entry, index) => {
+    const wrapped = isRecord(entry) && isRecord(entry.slip)
+    const slip = paymentSlipFrom(wrapped ? entry.slip : entry, defaults)
+    if (!slip) return []
+    const id = wrapped && typeof entry.id === 'string' && entry.id ? entry.id : stableLegacyId(slip, index)
+    if (seen.has(id)) return []
+    seen.add(id)
+    const createdAt = wrapped && typeof entry.createdAt === 'number' && Number.isFinite(entry.createdAt) ? entry.createdAt : 0
+    const updatedAt = wrapped && typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) ? entry.updatedAt : createdAt
+    return [{ id, createdAt, updatedAt, slip }]
+  })
+}
+
+export const saveHistory = (storage: Storage, records: PaymentRecord[]) => safeSet(storage, STORAGE_KEYS.history, JSON.stringify(envelope(records)))
 
 export type RecoverySnapshot = { slip: PaymentSlip; baseline: PaymentSlip; savedAt: number }
 
@@ -152,11 +221,53 @@ export const clearRecovery = (storage: Storage, preserveUnknown = false) => {
   return safeRemove(storage, STORAGE_KEYS.recovery)
 }
 
-export const loadTheme = (storage: Storage): 'light' | 'dark' | null => {
+const loadLegacyTheme = (storage: Storage): 'light' | 'dark' | null => {
   const raw = safeGet(storage, STORAGE_KEYS.theme)
   const parsed = safeParse(raw)
   const value = parsed === null && (raw === 'light' || raw === 'dark') ? raw : unwrapCurrentOrLegacy(parsed)
   return value === 'light' || value === 'dark' ? value : null
 }
 
-export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => safeSet(storage, STORAGE_KEYS.theme, JSON.stringify(envelope(theme)))
+export const DEFAULT_SETTINGS: AppSettings = { theme: 'system', defaultCurrency: 'LKR', referencePrefix: 'PS' }
+export const normalizeReferencePrefix = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(value.trim()) && value.trim().length <= 12 ? value.trim().toUpperCase() : DEFAULT_SETTINGS.referencePrefix
+export const loadSettings = (storage: Storage): AppSettings => {
+  const value = unwrapCurrentOrLegacy(safeParse(safeGet(storage, STORAGE_KEYS.settings)))
+  if (value !== invalidVersion && isRecord(value)) return {
+    theme: oneOf(value.theme, ['system', 'light', 'dark'] as const, DEFAULT_SETTINGS.theme),
+    defaultCurrency: oneOf<CurrencyCode>(value.defaultCurrency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], DEFAULT_SETTINGS.defaultCurrency),
+    referencePrefix: normalizeReferencePrefix(value.referencePrefix),
+  }
+  return { ...DEFAULT_SETTINGS, theme: loadLegacyTheme(storage) ?? DEFAULT_SETTINGS.theme }
+}
+export const saveSettings = (storage: Storage, settings: AppSettings) => safeSet(storage, STORAGE_KEYS.settings, JSON.stringify(envelope(settings)))
+export const loadTheme = (storage: Storage): 'light' | 'dark' | null => { const theme = loadSettings(storage).theme; return theme === 'system' ? null : theme }
+export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => saveSettings(storage, { ...loadSettings(storage), theme })
+
+const REFERENCE_STATE_KEY = 'payment-slip-reference-state-v1'
+const ACTIVE_REFERENCE_KEY = 'payment-slip-active-reference'
+const legacyReferenceKey = /^payment-slip-sequence-\d{4}$/
+
+const storageKeys = (storage: Storage) => {
+  try { return Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key): key is string => Boolean(key)) } catch { return [] }
+}
+
+const removeKeys = (storage: Storage, keys: string[]): PersistenceResult => {
+  for (const key of keys) {
+    const result = safeRemove(storage, key)
+    if (!result.success) return result
+  }
+  return { success: true }
+}
+
+export const clearDraftData = (storage: Storage) => removeKeys(storage, [STORAGE_KEYS.draft, STORAGE_KEYS.recovery])
+export const clearHistoryData = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.history)
+export const clearRecipientData = (storage: Storage) => safeRemove(storage, STORAGE_KEYS.recipients)
+export const clearReferenceData = (storage: Storage, session: Storage): PersistenceResult => {
+  const local = removeKeys(storage, [REFERENCE_STATE_KEY, ...storageKeys(storage).filter(key => legacyReferenceKey.test(key))])
+  return local.success ? safeRemove(session, ACTIVE_REFERENCE_KEY) : local
+}
+export const clearAllSliplyData = (storage: Storage, session: Storage): PersistenceResult => {
+  const localKeys = [...Object.values(STORAGE_KEYS), REFERENCE_STATE_KEY, ...storageKeys(storage).filter(key => legacyReferenceKey.test(key))]
+  const local = removeKeys(storage, [...new Set(localKeys)])
+  return local.success ? safeRemove(session, ACTIVE_REFERENCE_KEY) : local
+}

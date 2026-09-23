@@ -1,42 +1,71 @@
-name: Deploy to GitHub Pages
+name: Deploy Sliply Web
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+
 concurrency:
-  group: pages
+  group: vps-deployment
   cancel-in-progress: true
+
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - name: Build for GitHub Pages
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
         run: npm run build
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: /
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v1
         with:
-          path: dist
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v5
+          host: ${{ vars.VPS_DEPLOY_HOST }}
+          username: ${{ vars.VPS_DEPLOY_USER }}
+          key: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          port: 10030
+          script: |
+            echo "SSH connection successful"
+            whoami
+            hostname
+
+      - name: Prepare deployment directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.VPS_DEPLOY_HOST }}
+          username: ${{ vars.VPS_DEPLOY_USER }}
+          key: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          port: 10030
+          script: |
+            mkdir -p /var/www/slipy
+            rm -rf /var/www/slipy/*
+
+      - name: Upload build
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ vars.VPS_DEPLOY_HOST }}
+          username: ${{ vars.VPS_DEPLOY_USER }}
+          key: ${{ secrets.VPS_DEPLOY_SSH_KEY }}
+          port: 10030
+          source: "dist/*"
+          target: "/var/www/slipy"
+          strip_components: 1
