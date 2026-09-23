@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createBasicSlip } from '../test/fixtures/paymentSlips'
-import { loadCompany, loadDraft, loadTheme, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveTheme, STORAGE_KEYS } from './storage'
+import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearReferenceData, DEFAULT_SETTINGS, loadCompany, loadCompanyProfile, loadDraft, loadHistory, loadRecipients, loadSettings, loadTheme, normalizeReferencePrefix, persistenceMessage, safeParse, safeRemove, safeSet, saveCompany, saveDraft, saveHistory, saveRecipients, saveSettings, saveTheme, STORAGE_KEYS } from './storage'
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>()
@@ -36,7 +36,7 @@ describe('safe persisted data loading', () => {
     saveTheme(storage, 'dark')
     expect(JSON.parse(storage.getItem(STORAGE_KEYS.company)!)).toEqual({ version: 1, data: slip.company })
     expect(JSON.parse(storage.getItem(STORAGE_KEYS.draft)!)).toEqual({ version: 1, data: slip })
-    expect(JSON.parse(storage.getItem(STORAGE_KEYS.theme)!)).toEqual({ version: 1, data: 'dark' })
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.settings)!)).toEqual({ version: 1, data: { ...DEFAULT_SETTINGS, theme: 'dark' } })
     expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('dark')
@@ -51,6 +51,39 @@ describe('safe persisted data loading', () => {
     expect(loadCompany(storage, { ...slip.company, name: '' })).toEqual(slip.company)
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('light')
+  })
+
+  it('loads safe settings defaults and migrates the legacy theme key', () => {
+    const storage = new MemoryStorage()
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+    storage.setItem(STORAGE_KEYS.theme, JSON.stringify({ version: 1, data: 'dark' }))
+    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, theme: 'dark' })
+  })
+
+  it('round-trips one coherent settings envelope and normalizes reference prefixes', () => {
+    const storage = new MemoryStorage()
+    const settings = { theme: 'light' as const, defaultCurrency: 'EUR' as const, referencePrefix: 'INV-LK' }
+    expect(saveSettings(storage, settings).success).toBe(true)
+    expect(loadSettings(storage)).toEqual(settings)
+    expect(normalizeReferencePrefix(' pay-lk ')).toBe('PAY-LK')
+    expect(normalizeReferencePrefix('bad prefix!')).toBe('PS')
+  })
+
+  it('falls back field-by-field for corrupt settings', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.settings, JSON.stringify({ version: 1, data: { theme: 'neon', defaultCurrency: 'BTC', referencePrefix: 'bad prefix' } }))
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+    storage.setItem(STORAGE_KEYS.settings, '{broken')
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('does not reinterpret currency already stored in payment records', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    slip.payment.currency = 'USD'
+    saveDraft(storage, slip)
+    saveSettings(storage, { ...DEFAULT_SETTINGS, defaultCurrency: 'EUR' })
+    expect(loadDraft(storage, createBasicSlip())?.payment.currency).toBe('USD')
   })
 
   it('rejects unknown persistence versions without treating envelope data as legacy', () => {
@@ -102,13 +135,52 @@ describe('safe persisted data loading', () => {
     delete payment.sealText
     delete payment.paperSize
     delete payment.orientation
+    delete payment.status
+    delete payment.paidDate
+    delete payment.paidReference
     delete legacy.adjustments
     storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...legacy, company, payment }))
 
     const loaded = loadDraft(storage, createBasicSlip())
     expect(loaded?.company.themeColor).toBe('#123456')
-    expect(loaded?.payment).toMatchObject({ currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait' })
+    expect(loaded?.payment).toMatchObject({ currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait', status: 'draft', paidDate: '', paidReference: '' })
     expect(loaded?.adjustments).toEqual([])
+  })
+
+  it('persists paid status metadata and safely defaults unknown status values', () => {
+    const storage = new MemoryStorage()
+    const paid = createBasicSlip()
+    paid.payment.status = 'paid'
+    paid.payment.paidDate = '2026-09-03'
+    paid.payment.paidReference = 'SETTLEMENT-42'
+    saveDraft(storage, paid)
+    expect(loadDraft(storage, createBasicSlip())?.payment).toMatchObject({ status: 'paid', paidDate: '2026-09-03', paidReference: 'SETTLEMENT-42' })
+
+    const invalid = structuredClone(paid) as unknown as { payment: Record<string, unknown> }
+    invalid.payment.status = 'archived'
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify(invalid))
+    expect(loadDraft(storage, createBasicSlip())?.payment).toMatchObject({ status: 'draft', paidDate: '2026-09-03', paidReference: 'SETTLEMENT-42' })
+  })
+
+  it.each([
+    ['root fields', { description: 'Legacy service', amount: 1250.5 }],
+    ['payment fields', { payment: { description: 'Legacy service', amount: '1250.50' } }],
+  ])('migrates legacy description and amount from %s into one line item', (_name, legacyFields) => {
+    const storage = new MemoryStorage()
+    const legacy = createBasicSlip() as unknown as Record<string, unknown>
+    delete legacy.items
+    const payment = { ...(legacy.payment as Record<string, unknown>), ...('payment' in legacyFields ? legacyFields.payment : {}) }
+    const value = { ...legacy, ...legacyFields, payment }
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify(value))
+    expect(loadDraft(storage, createBasicSlip())?.items).toEqual([{ id: 'item-1', description: 'Legacy service', quantity: 1, rate: 1250.5 }])
+  })
+
+  it('rejects a pre-item draft when its legacy amount is malformed', () => {
+    const storage = new MemoryStorage()
+    const legacy = createBasicSlip() as unknown as Record<string, unknown>
+    delete legacy.items
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...legacy, description: 'Legacy service', amount: 'not-a-number' }))
+    expect(loadDraft(storage, createBasicSlip())).toBeNull()
   })
 
   it('recovers a malformed company profile field-by-field', () => {
@@ -130,7 +202,184 @@ describe('safe persisted data loading', () => {
     expect(loadDraft(storage, createBasicSlip())).toEqual(slip)
     expect(loadTheme(storage)).toBe('dark')
     storage.setItem(STORAGE_KEYS.theme, 'unknown')
-    expect(loadTheme(storage)).toBeNull()
+    expect(loadTheme(storage)).toBe('dark')
+  })
+
+  it('distinguishes a missing profile from a valid returning-user profile', () => {
+    const storage = new MemoryStorage()
+    const fallback = { ...createBasicSlip().company, name: '' }
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    expect(saveCompany(storage, createBasicSlip().company).success).toBe(true)
+    expect(loadCompanyProfile(storage, fallback)).toEqual(createBasicSlip().company)
+  })
+
+  it('updates and clears the single saved company profile without changing caller data', () => {
+    const storage = new MemoryStorage()
+    const original = createBasicSlip().company
+    const updated = { ...original, name: 'Updated Company' }
+    saveCompany(storage, original)
+    saveCompany(storage, updated)
+    expect(loadCompanyProfile(storage, original)).toEqual(updated)
+    expect(clearCompanyProfile(storage).success).toBe(true)
+    expect(loadCompanyProfile(storage, original)).toBeNull()
+    expect(updated.name).toBe('Updated Company')
+  })
+
+  it('persists Base64 logos but rejects stale object URLs during loading', () => {
+    const storage = new MemoryStorage()
+    const fallback = { ...createBasicSlip().company, logo: '' }
+    const profile = { ...fallback, logo: 'data:image/png;base64,AAAA' }
+    saveCompany(storage, profile)
+    expect(loadCompanyProfile(storage, fallback)?.logo).toBe(profile.logo)
+    storage.setItem(STORAGE_KEYS.company, JSON.stringify({ ...profile, logo: 'blob:https://example.test/stale' }))
+    expect(loadCompanyProfile(storage, fallback)?.logo).toBe('')
+  })
+
+  it('handles corrupted and unavailable profile storage without crashing', () => {
+    const storage = new MemoryStorage()
+    const fallback = createBasicSlip().company
+    storage.setItem(STORAGE_KEYS.company, '{broken')
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    storage.getItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    storage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    storage.removeItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(loadCompanyProfile(storage, fallback)).toBeNull()
+    expect(saveCompany(storage, fallback)).toMatchObject({ success: false, reason: 'access-denied' })
+    expect(clearCompanyProfile(storage)).toMatchObject({ success: false, reason: 'access-denied' })
+  })
+
+  it('round-trips saved recipients with stable IDs while omitting identification', () => {
+    const storage = new MemoryStorage()
+    const recipients = [
+      { id: 'recipient-1', name: 'Alex Silva', role: 'Designer', address: '', email: '', telephone: '' },
+      { id: 'recipient-2', name: 'Alex Silva', role: '', address: 'Colombo', email: 'alex@example.com', telephone: '' },
+    ]
+    expect(saveRecipients(storage, recipients).success).toBe(true)
+    expect(loadRecipients(storage)).toEqual(recipients)
+    expect(storage.getItem(STORAGE_KEYS.recipients)).not.toContain('identification')
+  })
+
+  it('loads legacy recipient arrays and skips malformed or duplicate-ID records', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.recipients, JSON.stringify([
+      { id: 'valid', name: 'Valid Recipient', role: 42, unknown: 'ignored' },
+      { id: 'valid', name: 'Duplicate ID' },
+      { id: '', name: 'Missing ID' },
+      { id: 'missing-name' },
+      null,
+    ]))
+    expect(loadRecipients(storage)).toEqual([{ id: 'valid', name: 'Valid Recipient', role: '', address: '', email: '', telephone: '' }])
+  })
+
+  it('returns an empty recipient list for empty, corrupted, non-array, or unknown-version data', () => {
+    const storage = new MemoryStorage()
+    expect(loadRecipients(storage)).toEqual([])
+    for (const value of ['{broken', JSON.stringify({ name: 'not-an-array' }), JSON.stringify({ version: 99, data: [] })]) {
+      storage.setItem(STORAGE_KEYS.recipients, value)
+      expect(loadRecipients(storage)).toEqual([])
+    }
+  })
+
+  it('reports blocked recipient writes without losing the in-memory collection', () => {
+    const storage = new MemoryStorage()
+    const recipients = [{ id: 'recipient-1', name: 'Saved', role: '', address: '', email: '', telephone: '' }]
+    storage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(saveRecipients(storage, recipients)).toMatchObject({ success: false, reason: 'access-denied' })
+    expect(recipients).toHaveLength(1)
+  })
+
+  it('round-trips history snapshots with record IDs independent from references', () => {
+    const storage = new MemoryStorage()
+    const first = createBasicSlip()
+    const second = structuredClone(first)
+    second.recipient.name = 'Second snapshot'
+    const records = [
+      { id: 'record-1', createdAt: 10, updatedAt: 20, slip: first },
+      { id: 'record-2', createdAt: 30, updatedAt: 40, slip: second },
+    ]
+    expect(saveHistory(storage, records).success).toBe(true)
+    const loaded = loadHistory(storage, createBasicSlip())
+    expect(loaded.map(record => record.id)).toEqual(['record-1', 'record-2'])
+    expect(loaded.map(record => record.slip.payment.reference)).toEqual(['PAY/001', 'PAY/001'])
+    loaded[0].slip.company.name = 'Edited copy'
+    expect(records[0].slip.company.name).toBe('Example Company')
+  })
+
+  it('migrates legacy raw-slip history entries to deterministic IDs', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.history, JSON.stringify([createBasicSlip()]))
+    const firstLoad = loadHistory(storage, createBasicSlip())
+    const secondLoad = loadHistory(storage, createBasicSlip())
+    expect(firstLoad).toHaveLength(1)
+    expect(firstLoad[0].id).toMatch(/^legacy-/)
+    expect(secondLoad[0].id).toBe(firstLoad[0].id)
+    expect(firstLoad[0]).toMatchObject({ createdAt: 0, updatedAt: 0 })
+  })
+
+  it('skips malformed and duplicate-ID history records without crashing', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    storage.setItem(STORAGE_KEYS.history, JSON.stringify({ version: 1, data: [
+      { id: 'valid', createdAt: 1, updatedAt: 2, slip },
+      { id: 'valid', createdAt: 3, updatedAt: 4, slip },
+      { id: 'broken', slip: { company: null } },
+      null,
+    ] }))
+    expect(loadHistory(storage, createBasicSlip())).toEqual([{ id: 'valid', createdAt: 1, updatedAt: 2, slip }])
+    storage.setItem(STORAGE_KEYS.history, '{broken')
+    expect(loadHistory(storage, createBasicSlip())).toEqual([])
+  })
+
+  it('clears each sensitive collection through scoped controls', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.draft, 'draft')
+    storage.setItem(STORAGE_KEYS.recovery, 'recovery')
+    storage.setItem(STORAGE_KEYS.history, 'history')
+    storage.setItem(STORAGE_KEYS.recipients, 'recipients')
+    expect(clearDraftData(storage).success).toBe(true)
+    expect(clearHistoryData(storage).success).toBe(true)
+    expect(clearRecipientData(storage).success).toBe(true)
+    expect(storage.getItem(STORAGE_KEYS.draft)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.recovery)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.history)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.recipients)).toBeNull()
+  })
+
+  it('clears reference state and legacy counters without removing unrelated origin data', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    storage.setItem('payment-slip-reference-state-v1', '{}')
+    storage.setItem('payment-slip-sequence-2026', '42')
+    storage.setItem('unrelated-application-key', 'keep')
+    session.setItem('payment-slip-active-reference', 'PS-2026-0042')
+    expect(clearReferenceData(storage, session).success).toBe(true)
+    expect(storage.getItem('payment-slip-reference-state-v1')).toBeNull()
+    expect(storage.getItem('payment-slip-sequence-2026')).toBeNull()
+    expect(session.getItem('payment-slip-active-reference')).toBeNull()
+    expect(storage.getItem('unrelated-application-key')).toBe('keep')
+  })
+
+  it('clears all and only Sliply-owned persistence keys', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    for (const key of Object.values(STORAGE_KEYS)) storage.setItem(key, 'value')
+    storage.setItem('payment-slip-reference-state-v1', '{}')
+    storage.setItem('payment-slip-sequence-2025', '9')
+    storage.setItem('another-app', 'preserved')
+    session.setItem('payment-slip-active-reference', 'PS-2026-0001')
+    expect(clearAllSliplyData(storage, session).success).toBe(true)
+    for (const key of Object.values(STORAGE_KEYS)) expect(storage.getItem(key)).toBeNull()
+    expect(storage.getItem('payment-slip-reference-state-v1')).toBeNull()
+    expect(storage.getItem('payment-slip-sequence-2025')).toBeNull()
+    expect(session.getItem('payment-slip-active-reference')).toBeNull()
+    expect(storage.getItem('another-app')).toBe('preserved')
+  })
+
+  it('reports storage-clearing failures without throwing', () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    storage.removeItem = () => { throw new DOMException('blocked', 'SecurityError') }
+    expect(clearAllSliplyData(storage, session)).toMatchObject({ success: false, reason: 'access-denied' })
   })
 
   it.each([

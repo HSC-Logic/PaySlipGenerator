@@ -1,5 +1,5 @@
 import type { PaymentSlip } from '../types'
-import { adjustmentAmount, currencies, finalTotal, formatCurrency, itemAmount, subtotal } from './currency'
+import { calculatePaymentTotals, currencies, formatCurrency } from './currency'
 import { numberToWords } from './amountInWords'
 
 export const paperSizes = { a4: [210, 297], a5: [148, 210], b5: [176, 250], letter: [216, 279] } as const
@@ -11,8 +11,9 @@ export const formatPaymentDate = (date: string) => date && !Number.isNaN(Date.pa
 export const formatPaymentReference = (reference: string) => reference.trim() || '—'
 
 export function buildPaymentSlipView(slip: PaymentSlip) {
-  const base = subtotal(slip.items)
-  const total = finalTotal(slip.items, slip.payment.adjustment, slip.adjustments)
+  const calculation = calculatePaymentTotals(slip.items, slip.payment.adjustment, slip.adjustments)
+  const base = calculation.subtotal
+  const total = calculation.final
   const currency = currencies[slip.payment.currency] || currencies.LKR
   const selectedSize = paperSizes[slip.payment.paperSize] || paperSizes.a4
   const [pageWidth, pageHeight] = slip.payment.orientation === 'landscape' ? [selectedSize[1], selectedSize[0]] : selectedSize
@@ -39,12 +40,12 @@ export function buildPaymentSlipView(slip: PaymentSlip) {
     },
     items: slip.items.map((item, index) => ({
       id: item.id, index: String(index + 1).padStart(2, '0'), description: item.description || 'Payment item description',
-      quantity: String(item.quantity), rate: formatCurrency(item.rate, slip.payment.currency), amount: formatCurrency(itemAmount(item), slip.payment.currency),
+      quantity: String(item.quantity), rate: formatCurrency(item.rate, slip.payment.currency), amount: formatCurrency(calculation.itemAmounts[index], slip.payment.currency),
     })),
     totals: {
       base, total, subtotal: formatCurrency(base, slip.payment.currency), final: formatCurrency(total, slip.payment.currency),
       adjustment: slip.payment.adjustment !== '' && slip.payment.adjustment !== 0 ? formatCurrency(slip.payment.adjustment, slip.payment.currency) : '',
-      entries: slip.adjustments.map(entry => ({ id: entry.id, label: `${entry.label}${entry.mode === 'percentage' ? ` (${entry.value || 0}%)` : ''}`, amount: formatCurrency(adjustmentAmount(entry, base), slip.payment.currency) })),
+      entries: slip.adjustments.map((entry, index) => ({ id: entry.id, label: `${entry.label}${entry.mode === 'percentage' ? ` (${entry.value || 0}%)` : ''}`, amount: formatCurrency(calculation.adjustmentAmounts[index], slip.payment.currency) })),
       words: numberToWords(Math.max(total, 0), currency.major, currency.minor),
     },
     page: { width: pageWidth, height: pageHeight },
