@@ -1,3 +1,6 @@
+import { DesignerCanvas } from '../designer/DesignerCanvas'
+import { parseCustomDesign } from '../../utils/customDesigns'
+import { designForeground } from '../../utils/customDesigns'
 import { useMemo, type CSSProperties } from 'react'
 import type { PaymentSlip } from '../../types'
 import { buildPaymentSlipView } from '../../utils/paymentSlipView'
@@ -6,7 +9,9 @@ const Meta = ({ label, value }: { label: string; value?: string }) => value ? <d
 
 export function PaymentSlipPreview({ slip, showBranding = true }: { slip: PaymentSlip; showBranding?: boolean }) {
   const view = useMemo(() => buildPaymentSlipView(slip), [slip])
-  return <article className={`slip ${view.payment.orientation} template-${view.payment.template}`} id="payment-slip" aria-label={`${view.payment.documentLabel || 'Document'} preview`} style={{ '--document-color': view.themeColor, aspectRatio: `${view.page.width} / ${view.page.height}` } as CSSProperties}>
+  const blocks = parseCustomDesign(slip.payment.customDesign)?.blocks
+  if (blocks) return <DesignerCanvas slip={slip} blocks={blocks} showBranding={showBranding} />
+  return <article className={`slip ${view.payment.orientation} template-${view.payment.template}`} id="payment-slip" aria-label={`${view.payment.documentLabel || 'Document'} preview`} style={{ '--document-color': view.themeColor, '--document-foreground': designForeground(view.themeColor), fontFamily: view.font === 'times' ? 'Georgia, serif' : view.font === 'courier' ? 'Courier New, monospace' : 'Arial, sans-serif', aspectRatio: `${view.page.width} / ${view.page.height}` } as CSSProperties}>
     <div className="slip-topline" />
     <header className="slip-header">
       <div className="brand-lockup">{view.company.logo ? <img src={view.company.logo} alt="Company logo" /> : <div className="logo-placeholder">{view.company.initials}</div>}<div><h1>{view.company.name}</h1><p>{view.company.address}</p>{view.company.contacts && <p>{view.company.contacts}</p>}{view.company.registration && <p>{view.company.registration}</p>}</div></div>

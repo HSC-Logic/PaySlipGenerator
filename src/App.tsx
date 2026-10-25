@@ -16,13 +16,13 @@ import { buildPdf, downloadPdfDocument, printPdfDocument } from './utils/pdf'
 import { runDocumentAction } from './utils/documentActions'
 import { createSimilarSlip } from './utils/similarSlip'
 import { copySlip, prepareDestructiveReplacement } from './utils/dirtyState'
-import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearRecovery, clearReferenceData, DEFAULT_SETTINGS, loadCompanyProfile, loadDraft as loadStoredDraft, loadHistory, loadRecovery, loadRecipients, loadSettings, normalizeReferencePrefix, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveHistory as saveStoredHistory, saveRecipients as saveStoredRecipients, saveSettings, type PersistenceResult } from './utils/storage'
+import { clearAllSliplyData, clearCompanyProfile, clearDraftData, clearHistoryData, clearRecipientData, clearRecovery, clearReferenceData, DEFAULT_SETTINGS, loadCompanyProfile, loadDraft as loadStoredDraft, loadHistory, loadRecovery, loadRecipients, loadSettings, normalizeReferencePrefix, paymentSlipFrom, persistenceMessage, saveCompany as saveStoredCompany, saveDraft as saveStoredDraft, saveHistory as saveStoredHistory, saveRecipients as saveStoredRecipients, saveSettings, type PersistenceResult } from './utils/storage'
 import { loadMeaningfulRecovery, persistRecoveryState } from './utils/recovery'
 import { chooseFolder, connectDrive, createGoogleDoc, disconnectDrive, driveConfigured, uploadPdfToDrive } from './services/googleDrive'
 import { useAuth } from './features/auth/AuthProvider'
 import { CloudSaveButton } from './components/payments/CloudSaveButton'
 import { createBlankSlip, today } from './utils/paymentDefaults'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 const blank = createBlankSlip
 const systemPrefersDark = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -42,6 +42,9 @@ const initialPaymentState = () => {
 
 export default function App({ initialSlip, cloudRecordId = '', cloudCompanyId = '', showBranding = true }: { initialSlip?: PaymentSlip; cloudRecordId?: string; cloudCompanyId?: string; showBranding?: boolean } = {}) {
   const auth = useAuth()
+  const location = useLocation()
+  const returnedSlip = paymentSlipFrom((location.state as { slip?: PaymentSlip } | null)?.slip, blank())
+  initialSlip = returnedSlip || initialSlip
   const [startup] = useState(() => initialSlip ? { slip: copySlip(initialSlip), baseline: copySlip(initialSlip), recovered: false, hasProfile: false, settings: loadSettings(localStorage) } : initialPaymentState())
   const [slip, setSlip] = useState<PaymentSlip>(startup.slip)
   const [creationMode, setCreationMode] = useState<'quick' | 'full'>('quick')
