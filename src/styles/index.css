@@ -74,3 +74,15 @@
 .settings-fields{grid-template-columns:minmax(220px,280px) minmax(250px,340px) auto;justify-content:start;align-items:start;column-gap:14px;row-gap:12px;max-width:820px}.settings-fields>.button{margin-top:15px;white-space:nowrap}.settings-fields small{line-height:1.4}
 @media(max-width:760px){.settings-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:none}.settings-fields>.button{grid-column:1/-1;margin-top:0;justify-self:start}}
 @media(max-width:520px){.settings-fields{grid-template-columns:1fr}.settings-fields>.button{grid-column:auto;width:100%}}
+
+/* Account entry and navigation actions. */
+a.button{text-decoration:none}
+.auth-card h1{margin:8px 0 0;font:800 28px Manrope}
+.auth-card>p{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+.auth-card>.button{min-height:44px}
+.auth-card nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:16px;border-top:1px solid var(--line)}
+.auth-card nav .button{min-height:40px}
+.auth-card nav .button:last-child{grid-column:1/-1}
+.header-account{white-space:nowrap}
+.header-account.primary{color:#fff}
+@media(max-width:620px){.app-header{height:auto;min-height:68px;gap:14px;flex-wrap:wrap;padding-block:12px}.header-status{flex-wrap:wrap}}
