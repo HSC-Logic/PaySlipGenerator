@@ -34,6 +34,7 @@ export function buildPaymentSlipView(slip: PaymentSlip) {
     },
     recipient: { name: slip.recipient.name || 'Recipient name', role: slip.recipient.role, details: recipientDetails },
     payment: {
+      template: (['minimal', 'modern'] as const).find(template => template === slip.payment.template) || 'classic',
       reference: formatPaymentReference(slip.payment.reference), rawReference: slip.payment.reference, date: formatPaymentDate(slip.payment.date), rawDate: slip.payment.date,
       documentLabel: getDocumentTypeLabel(slip), documentHeading: getDocumentHeading(slip), method: getPaymentMethodLabel(slip), title: slip.payment.title || 'Payment title or purpose', bankName: slip.payment.bankName,
       transactionReference: slip.payment.transactionReference, notes: slip.payment.notes, sealText: slip.payment.sealText,

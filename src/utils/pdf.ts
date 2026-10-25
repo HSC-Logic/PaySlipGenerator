@@ -57,7 +57,7 @@ export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } 
   const bodyLine = compact ? 3.3 : 4.2
   const labelSize = compact ? 5.5 : 6.8
   const sectionGap = compact ? 5 : 7
-  const addTopBar = () => { doc.setFillColor(...navy); doc.rect(0, 0, pageWidth, 4, 'F') }
+  const addTopBar = () => { doc.setFillColor(...navy); if (view.payment.template === 'minimal') return; if (view.payment.template === 'modern') doc.rect(0, 0, 4, pageHeight, 'F'); else doc.rect(0, 0, pageWidth, 4, 'F') }
   const addContinuationPage = (title: string) => {
     doc.addPage(slip.payment.paperSize || 'a4', orientation)
     addTopBar()
@@ -117,7 +117,7 @@ export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } 
   doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentWidth, purposeHeight, 2, 2, 'F'); drawLabel('PAYMENT FOR', marginX + 5, y + (compact ? 4 : 5)); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(purposeLines, marginX + 5, y + (compact ? 8 : 10)); y += purposeHeight + sectionGap
 
   const tableWidths = getPdfTableColumnWidths(contentWidth)
-  autoTable(doc, { startY: y, margin: { left: marginX, right: marginX, bottom: pageHeight - contentBottom, top: layout.marginTop + 10 }, showHead: 'everyPage', rowPageBreak: 'avoid', head: [['#', 'Description', 'Qty', 'Rate', 'Amount']], body: view.items.map(item => [item.index, item.description, item.quantity, item.rate, item.amount]), theme: 'plain', headStyles: { fillColor: navy, textColor: 255, fontSize: compact ? 6.2 : 8, cellPadding: compact ? 1.6 : 3 }, bodyStyles: { textColor: [45, 55, 68], fontSize: compact ? 6.2 : 8.5, cellPadding: compact ? 1.5 : 3, lineColor: [226, 230, 235], lineWidth: { bottom: .15 } }, columnStyles: { 0: { cellWidth: tableWidths[0] }, 1: { cellWidth: tableWidths[1] }, 2: { halign: 'right', cellWidth: tableWidths[2] }, 3: { halign: 'right', cellWidth: tableWidths[3] }, 4: { halign: 'right', cellWidth: tableWidths[4] } } })
+  autoTable(doc, { startY: y, margin: { left: marginX, right: marginX, bottom: pageHeight - contentBottom, top: layout.marginTop + 10 }, showHead: 'everyPage', rowPageBreak: 'avoid', head: [['#', 'Description', 'Qty', 'Rate', 'Amount']], body: view.items.map(item => [item.index, item.description, item.quantity, item.rate, item.amount]), theme: 'plain', headStyles: { fillColor: view.payment.template === 'classic' ? navy : [240, 243, 247], textColor: view.payment.template === 'classic' ? 255 : navy, fontSize: compact ? 6.2 : 8, cellPadding: compact ? 1.6 : 3 }, bodyStyles: { textColor: [45, 55, 68], fontSize: compact ? 6.2 : 8.5, cellPadding: compact ? 1.5 : 3, lineColor: [226, 230, 235], lineWidth: { bottom: .15 } }, columnStyles: { 0: { cellWidth: tableWidths[0] }, 1: { cellWidth: tableWidths[1] }, 2: { halign: 'right', cellWidth: tableWidths[2] }, 3: { halign: 'right', cellWidth: tableWidths[3] }, 4: { halign: 'right', cellWidth: tableWidths[4] } } })
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + sectionGap
 
   const totalsWidth = landscape ? contentWidth * 0.34 : contentWidth * 0.38

@@ -13,6 +13,18 @@ class MemoryStorage implements Storage {
 }
 
 describe('safe persisted data loading', () => {
+  it('persists document designs and falls back for unsupported values', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    for (const template of ['classic', 'minimal', 'modern'] as const) {
+      slip.payment.template = template
+      saveDraft(storage, slip)
+      expect(loadDraft(storage, createBasicSlip())?.payment.template).toBe(template)
+    }
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...slip, payment: { ...slip.payment, template: 'unknown' } }))
+    expect(loadDraft(storage, createBasicSlip())?.payment.template).toBe('classic')
+  })
+
   it('parses valid JSON and safely handles invalid, empty, and null values', () => {
     expect(safeParse('{"ok":true}')).toEqual({ ok: true })
     expect(safeParse('{invalid')).toBeNull()
