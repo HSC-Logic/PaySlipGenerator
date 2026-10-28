@@ -88,7 +88,7 @@ describe('apiFetch', () => {
   })
   it('turns validation errors into readable field messages', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => problem('validation', 400, { errors: { 'slip.items[0].quantity': ['must have at most 4 decimals'], referencePrefix: ['is invalid'] } })))
-    const error = await apiFetch('/payment-slips', { method: 'POST', body: '{}' }).catch(reason => reason)
+    const error: ApiError = await apiFetch('/payment-slips', { method: 'POST', body: '{}' }).catch(reason => reason)
     expect(error).toMatchObject({ kind: 'validation', status: 400, fieldErrors: { 'slip.items[0].quantity': ['must have at most 4 decimals'] } })
     expect(error.message).toContain('Item 1 quantity: must have at most 4 decimals'); expect(error.message).toContain('Reference prefix: is invalid')
   })
