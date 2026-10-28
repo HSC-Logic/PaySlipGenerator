@@ -2,6 +2,10 @@
 
 A browser-based payment-slip workspace for creating professional payment records. Sliply is built with React, TypeScript, and Vite and is deployed as a static site to a VPS. PDF generation, printing, draft storage, and calculations work without a backend.
 
+Sliply now has an optional Phase 1 cloud foundation. Guest users keep the complete local creation workflow without an account. Slipy Pro accounts (HSClogic sign-in plus the Slipy API) can manage cloud companies and recipients, store payment snapshots, search history, and access records across devices. Free accounts keep everything in the browser with no limits.
+
+See [architecture](docs/architecture.md), [security and privacy](docs/security-and-privacy.md), and [Phase 1 QA](docs/phase-1-qa.md).
+
 ## Features
 
 - Live payment-slip preview with responsive desktop and mobile layouts
@@ -18,7 +22,7 @@ A browser-based payment-slip workspace for creating professional payment records
 - Browser-local saved company profile, reusable recipients, drafts, and yearly `PS-{YEAR}-{SEQUENCE}` reference sequence
 - Searchable browser-local payment history with snapshot editing and duplication
 - Field-level validation, accessible labels, notices, and loading states
-- Optional, session-only Google Drive OAuth and Google Docs creation
+- Optional Pro-only Google Drive saving (PDF upload and Google Docs creation) through the Slipy API
 - Automated calculation/reference tests and VPS deployment workflow
 
 ## Local development
@@ -51,16 +55,16 @@ The `main` branch workflow builds the site, runs tests, and uploads `dist/` to `
 
 ## Enable Google Drive and Docs
 
-The core application does not need Google configuration. To enable the optional buttons:
+The core application does not need Google configuration. Google Drive is a Slipy Pro feature that runs through the Slipy API, so it also needs `VITE_API_BASE_URL` and the Cognito settings, and the API must hold the OAuth client secret. To enable the optional buttons:
 
 1. Create or select a project in [Google Cloud Console](https://console.cloud.google.com/).
 2. In **APIs & Services → Library**, enable **Google Drive API** and **Google Docs API**.
 3. Open **Google Auth Platform** and configure the OAuth consent screen. Add the app name, support email, developer contact, and any test users required while the app remains in testing.
 4. Create an OAuth client from **APIs & Services → Credentials → Create credentials → OAuth client ID** and choose **Web application**.
-5. Add both local development and the exact VPS origin as authorized JavaScript origins, for example:
-    - `http://localhost:5173`
-    - `https://slipy.hsclogic.link`
-6. Copy the public client ID. Never create or include a client secret in this client-side app.
+5. Add both local development and the exact production origin as authorized JavaScript origins, for example:
+   - `http://localhost:5173`
+   - `https://slipy.hsclogic.com`
+6. Copy the public client ID. The client secret belongs only in the Slipy API's environment; never include it in this client-side app.
 7. Locally, place it in an uncommitted `.env` file:
 
    ```env
@@ -70,19 +74,19 @@ The core application does not need Google configuration. To enable the optional 
 
 8. Add it as a repository variable named `VITE_GOOGLE_CLIENT_ID` under **Settings → Secrets and variables → Actions → Variables**. It is a public browser client identifier, not a secret.
 
-The integration requests only `drive.file`, which limits access to files created or explicitly opened by this application. Access tokens are retained only in memory and are never persisted to localStorage. Disconnecting revokes the current token.
+The integration requests only `drive.file`, which limits access to files created or explicitly opened by this application. The browser opens Google's consent popup (`initCodeClient`) and sends the one-time code to the Slipy API, which stores the refresh token encrypted. No Google token reaches the browser. Disconnecting revokes the token at Google through the API. Free accounts see an upgrade panel instead of the Drive tools.
 
 ### Folder selection note
 
-The application lists folders that the granted `drive.file` scope makes available and asks the user to select one. Under this minimum-privilege scope, Google may only expose folders the app has created or that the user has explicitly opened with the app. If no folder is visible, create or expose a folder to the app first. A broader all-Drive scope is intentionally not requested.
+The application lists folders that the granted `drive.file` scope makes available (through the API) and asks the user to select one. Under this minimum-privilege scope, Google may only expose folders the app has created or that the user has explicitly opened with the app. On first use, if no folder is available, Sliply creates a dedicated `Sliply` folder automatically. A broader all-Drive scope is intentionally not requested.
 
 ## Privacy and security
 
 - Payment information, NIC/ID details, company profiles, drafts, recovery snapshots, and explicit history snapshots are stored in the browser's localStorage. Reusable saved-recipient records deliberately exclude NIC/ID; NIC/ID remains only where needed to preserve a draft, recovery snapshot, or historical payment. The active generated reference is kept in sessionStorage.
 - There is no analytics, advertising, behavioral tracking, application backend, or database.
 - The interface loads DM Sans and Manrope from Google Fonts when the page opens. As with any external web resource, that request exposes ordinary connection metadata such as the user's IP address and browser headers to the resource provider; it does not include the payment form contents.
-- The optional Google integration connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Create Google Doc** sends the payment reference in the file title and sends the document's textual payment content to Google Drive and Docs for storage in the user's selected folder. It does not upload the logo.
-- OAuth access tokens are held in memory for the current page session only.
+- The optional Pro Google integration (via the Slipy API) connects only after the user selects **Connect Drive** and authorizes the requested `drive.file` scope. Folder selection retrieves available folder names and IDs. **Save PDF to Drive** uploads the exact PDF produced by the shared Download/Print renderer, including its embedded logo when present. **Create Google Doc** sends the payment reference in the file title and the document's textual payment content to Google Drive and Docs for storage in the selected folder.
+- Google tokens are stored only by the Slipy API (encrypted refresh token); the browser never holds one.
 - Local browser data is not encrypted; avoid using a shared browser profile for sensitive records and clear site data when appropriate.
 - Uploaded logos are limited to image files smaller than 2 MB. Logos are stored as Base64 data, which adds roughly one-third to the source file size; because a logo may also be present in the company profile, explicit draft, and recovery snapshots, large logos can approach browser storage quotas. The application reports quota failures without changing image quality or discarding the in-memory form.
 - The **Privacy & stored data** controls can clear draft/recovery, history, reusable recipients, or reference state independently. **Clear all Sliply data** removes only Sliply-owned keys, resets the open form after confirmation, and does not call `localStorage.clear()` or remove data owned by another application on the same origin.

@@ -1,0 +1,607 @@
+{
+  "description": "Shared by the frontend Vitest suite (src/utils/currency.ts) and API.Tests (Slipy.Core PaymentTotals). Expected values were produced by calculatePaymentTotals. Empty strings stand for the editor's empty inputs.",
+  "cases": [
+    {
+      "name": "two lines, no adjustments",
+      "items": [
+        {
+          "quantity": 2,
+          "rate": 1500
+        },
+        {
+          "quantity": 1,
+          "rate": 500
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          3000,
+          500
+        ],
+        "subtotal": 3500,
+        "adjustmentAmounts": [],
+        "final": 3500
+      }
+    },
+    {
+      "name": "positive manual adjustment",
+      "items": [
+        {
+          "quantity": 2,
+          "rate": 1500
+        },
+        {
+          "quantity": 1,
+          "rate": 500
+        }
+      ],
+      "adjustment": 500,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          3000,
+          500
+        ],
+        "subtotal": 3500,
+        "adjustmentAmounts": [],
+        "final": 4000
+      }
+    },
+    {
+      "name": "negative manual adjustment",
+      "items": [
+        {
+          "quantity": 2,
+          "rate": 1500
+        },
+        {
+          "quantity": 1,
+          "rate": 500
+        }
+      ],
+      "adjustment": -250,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          3000,
+          500
+        ],
+        "subtotal": 3500,
+        "adjustmentAmounts": [],
+        "final": 3250
+      }
+    },
+    {
+      "name": "empty manual adjustment",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 100
+        }
+      ],
+      "adjustment": "",
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          100
+        ],
+        "subtotal": 100,
+        "adjustmentAmounts": [],
+        "final": 100
+      }
+    },
+    {
+      "name": "percentage discount and tax",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 1000
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "discount",
+          "mode": "percentage",
+          "value": 10
+        },
+        {
+          "kind": "tax",
+          "mode": "percentage",
+          "value": 18
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          1000
+        ],
+        "subtotal": 1000,
+        "adjustmentAmounts": [
+          -100,
+          180
+        ],
+        "final": 1080
+      }
+    },
+    {
+      "name": "decimal quantity is rounded to minor units",
+      "items": [
+        {
+          "quantity": 1.5,
+          "rate": 19.99
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.2
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          29.99,
+          0.1,
+          0.2
+        ],
+        "subtotal": 30.29,
+        "adjustmentAmounts": [],
+        "final": 30.29
+      }
+    },
+    {
+      "name": "percentage adjustment rounds to the nearest minor unit",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 10.01
+        }
+      ],
+      "adjustment": 0.1,
+      "adjustments": [
+        {
+          "kind": "tax",
+          "mode": "percentage",
+          "value": 17.5
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          10.01
+        ],
+        "subtotal": 10.01,
+        "adjustmentAmounts": [
+          1.75
+        ],
+        "final": 11.86
+      }
+    },
+    {
+      "name": "empty quantity and rate count as zero",
+      "items": [
+        {
+          "quantity": "",
+          "rate": ""
+        },
+        {
+          "quantity": "",
+          "rate": 100
+        },
+        {
+          "quantity": 3,
+          "rate": ""
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          0,
+          0,
+          0
+        ],
+        "subtotal": 0,
+        "adjustmentAmounts": [],
+        "final": 0
+      }
+    },
+    {
+      "name": "zero quantity",
+      "items": [
+        {
+          "quantity": 0,
+          "rate": 100
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          0
+        ],
+        "subtotal": 0,
+        "adjustmentAmounts": [],
+        "final": 0
+      }
+    },
+    {
+      "name": "negative quantity",
+      "items": [
+        {
+          "quantity": -2,
+          "rate": 10
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          -20
+        ],
+        "subtotal": -20,
+        "adjustmentAmounts": [],
+        "final": -20
+      }
+    },
+    {
+      "name": "large amounts",
+      "items": [
+        {
+          "quantity": 99999.99,
+          "rate": 99999.99
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          9999998000
+        ],
+        "subtotal": 9999998000,
+        "adjustmentAmounts": [],
+        "final": 9999998000
+      }
+    },
+    {
+      "name": "half cent rounds away from zero (positive)",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 0.005
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          0.01
+        ],
+        "subtotal": 0.01,
+        "adjustmentAmounts": [],
+        "final": 0.01
+      }
+    },
+    {
+      "name": "half cent rounds away from zero (negative)",
+      "items": [
+        {
+          "quantity": -1,
+          "rate": 0.005
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          -0.01
+        ],
+        "subtotal": -0.01,
+        "adjustmentAmounts": [],
+        "final": -0.01
+      }
+    },
+    {
+      "name": "rate with three decimals",
+      "items": [
+        {
+          "quantity": 3,
+          "rate": 0.335
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          1.01
+        ],
+        "subtotal": 1.01,
+        "adjustmentAmounts": [],
+        "final": 1.01
+      }
+    },
+    {
+      "name": "quantity with four decimals",
+      "items": [
+        {
+          "quantity": 0.3333,
+          "rate": 10
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          3.33
+        ],
+        "subtotal": 3.33,
+        "adjustmentAmounts": [],
+        "final": 3.33
+      }
+    },
+    {
+      "name": "fixed charges of every kind",
+      "items": [
+        {
+          "quantity": 4,
+          "rate": 25
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "service",
+          "mode": "fixed",
+          "value": 5
+        },
+        {
+          "kind": "delivery",
+          "mode": "fixed",
+          "value": 12.5
+        },
+        {
+          "kind": "charge",
+          "mode": "fixed",
+          "value": 0.01
+        },
+        {
+          "kind": "discount",
+          "mode": "fixed",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          100
+        ],
+        "subtotal": 100,
+        "adjustmentAmounts": [
+          5,
+          12.5,
+          0.01,
+          -3
+        ],
+        "final": 114.51
+      }
+    },
+    {
+      "name": "adjustments are all based on the subtotal, not compounded",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 200
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "discount",
+          "mode": "percentage",
+          "value": 50
+        },
+        {
+          "kind": "tax",
+          "mode": "percentage",
+          "value": 50
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          200
+        ],
+        "subtotal": 200,
+        "adjustmentAmounts": [
+          -100,
+          100
+        ],
+        "final": 200
+      }
+    },
+    {
+      "name": "discount larger than the subtotal gives a negative final total",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 100
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "discount",
+          "mode": "fixed",
+          "value": 250
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          100
+        ],
+        "subtotal": 100,
+        "adjustmentAmounts": [
+          -250
+        ],
+        "final": -150
+      }
+    },
+    {
+      "name": "percentage with three decimals",
+      "items": [
+        {
+          "quantity": 7,
+          "rate": 13.37
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "tax",
+          "mode": "percentage",
+          "value": 12.345
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          93.59
+        ],
+        "subtotal": 93.59,
+        "adjustmentAmounts": [
+          11.55
+        ],
+        "final": 105.14
+      }
+    },
+    {
+      "name": "empty adjustment value",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 100
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [
+        {
+          "kind": "tax",
+          "mode": "fixed",
+          "value": ""
+        },
+        {
+          "kind": "tax",
+          "mode": "percentage",
+          "value": ""
+        }
+      ],
+      "expected": {
+        "itemAmounts": [
+          100
+        ],
+        "subtotal": 100,
+        "adjustmentAmounts": [
+          0,
+          0
+        ],
+        "final": 100
+      }
+    },
+    {
+      "name": "no items",
+      "items": [],
+      "adjustment": 12.34,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [],
+        "subtotal": 0,
+        "adjustmentAmounts": [],
+        "final": 12.34
+      }
+    },
+    {
+      "name": "many small lines add up without floating point drift",
+      "items": [
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        },
+        {
+          "quantity": 1,
+          "rate": 0.1
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1
+        ],
+        "subtotal": 1,
+        "adjustmentAmounts": [],
+        "final": 1
+      }
+    },
+    {
+      "name": "values written in exponent notation",
+      "items": [
+        {
+          "quantity": 0.01,
+          "rate": 1000
+        }
+      ],
+      "adjustment": 0,
+      "adjustments": [],
+      "expected": {
+        "itemAmounts": [
+          10
+        ],
+        "subtotal": 10,
+        "adjustmentAmounts": [],
+        "final": 10
+      }
+    }
+  ]
+}

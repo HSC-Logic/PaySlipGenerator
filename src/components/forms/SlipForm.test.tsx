@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBasicSlip } from '../../test/fixtures/paymentSlips'
 import type { PaymentSlip } from '../../types'
@@ -13,10 +14,23 @@ afterEach(cleanup)
 function Harness({ initial, step = 'payment' }: { initial: PaymentSlip; step?: 'company' | 'recipient' | 'payment' }) {
   const [slip, setSlip] = useState(initial)
   const [quick, setQuick] = useState(true)
-  return <><button onClick={() => setQuick(value => !value)}>Switch mode</button><SlipForm slip={slip} errors={{}} step={step} quickMode={quick} hasCompanyProfile={Boolean(initial.company.name)} savedRecipients={[]} selectedRecipientId="" onChange={setSlip} {...handlers} /></>
+  return <MemoryRouter><button onClick={() => setQuick(value => !value)}>Switch mode</button><SlipForm slip={slip} errors={{}} step={step} quickMode={quick} hasCompanyProfile={Boolean(initial.company.name)} savedRecipients={[]} selectedRecipientId="" onChange={setSlip} {...handlers} /></MemoryRouter>
 }
 
 describe('Quick Slip interaction mode', () => {
+  it('progressively reveals custom document and payment-method fields without losing their values', () => {
+    render(<Harness initial={createBasicSlip()} />)
+    fireEvent.change(screen.getByLabelText('Document type'), { target: { value: 'other' } })
+    fireEvent.change(screen.getByLabelText(/^Custom document type/), { target: { value: 'Service Estimate' } })
+    fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'Other' } })
+    fireEvent.change(screen.getByLabelText(/^Custom payment method/), { target: { value: 'Wise' } })
+    fireEvent.change(screen.getByLabelText('Document type'), { target: { value: 'invoice' } })
+    expect(screen.queryByLabelText(/^Custom document type/)).toBeNull()
+    fireEvent.change(screen.getByLabelText('Document type'), { target: { value: 'other' } })
+    expect(screen.getByLabelText(/^Custom document type/)).toHaveProperty('value', 'Service Estimate')
+    expect(screen.getByLabelText(/^Custom payment method/)).toHaveProperty('value', 'Wise')
+  })
+
   it('shows actual required payment fields and progressively discloses optional sections', () => {
     render(<Harness initial={createBasicSlip()} />)
     for (const label of ['Payment date', 'Payment reference', 'Payment title / purpose', 'Currency', 'Description', 'Qty', 'Rate']) expect(screen.getByLabelText(new RegExp(`^${label}`))).toBeTruthy()

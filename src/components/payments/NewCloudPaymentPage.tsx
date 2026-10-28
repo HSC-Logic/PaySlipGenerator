@@ -1,0 +1,11 @@
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import App from '../../App'
+import type { CloudCompany, PaymentSlip } from '../../types'
+import { createBlankSlip } from '../../utils/paymentDefaults'
+import { ApiCompanyRepository, ApiPaymentRepository } from '../../services/repositories/apiRepository'
+import { resolveCompanyLogo, resolveSlipLogo } from '../../services/logos'
+import { useAuth } from '../../features/auth/AuthProvider'
+import { showSliplyBranding } from '../../features/auth/entitlements'
+const companies=new ApiCompanyRepository();const payments=new ApiPaymentRepository()
+export function NewCloudPaymentPage(){const location=useLocation();const auth=useAuth();const supplied=(location.state as{slip?:PaymentSlip}|null)?.slip;const[initial,setInitial]=useState<PaymentSlip|null>(null);const[company,setCompany]=useState<CloudCompany|null>(null);const[error,setError]=useState('');useEffect(()=>{companies.list().then(async rows=>{const selected=(supplied&&rows.find(x=>x.name===supplied.company.name))||rows.find(x=>x.isDefault)||rows[0];if(!selected)throw new Error('Add a cloud company before creating a cloud payment.');const next=supplied?structuredClone(await resolveSlipLogo(supplied)):createBlankSlip(selected.defaultCurrency);if(!supplied){const withLogo=await resolveCompanyLogo(selected);next.company={name:selected.name,address:selected.address,telephone:selected.telephone,email:selected.email,registrationNumber:selected.registrationNumber,logo:withLogo.logo,logoId:selected.logoId,authorizedName:selected.authorizedName,authorizedDesignation:selected.authorizedDesignation,themeColor:selected.themeColor};next.payment.currency=selected.defaultCurrency;next.payment.paperSize=selected.defaultPaperSize;next.payment.orientation=selected.defaultOrientation}next.payment.reference=await payments.nextReference(selected.id);setCompany(selected);setInitial(next)}).catch(x=>setError(x instanceof Error?x.message:'Could not prepare a cloud payment.'))},[supplied]);if(error)return <main className="route-state" role="alert">{error}</main>;if(!initial)return <main className="route-state" role="status">Preparing a secure reference…</main>;return <App initialSlip={initial} cloudCompanyId={company?.id} showBranding={showSliplyBranding(auth.plan,company?.showSliplyBranding??true)}/>} 

@@ -79,4 +79,14 @@ describe('workflow validation', () => {
     expect(result['company.email']).toBe('Enter a valid email address.')
     expect(result['recipient.email']).toBe('Enter a valid email address.')
   })
+
+  it('requires trimmed custom document and payment method values only for Other', () => {
+    const slip = validSlip(); slip.payment.documentType = 'other'; slip.payment.customDocumentType = '  '; slip.payment.method = 'Other'; slip.payment.customPaymentMethod = ' '
+    expect(validateSlip(slip)['payment.customDocumentType']).toBe('Enter a document type.')
+    expect(validateSlip(slip)['payment.customPaymentMethod']).toBe('Enter the payment method.')
+    slip.payment.customDocumentType = 'Payment Voucher'; slip.payment.customPaymentMethod = 'Wise'
+    expect(validateSlip(slip)['payment.customDocumentType']).toBeUndefined(); expect(validateSlip(slip)['payment.customPaymentMethod']).toBeUndefined()
+    slip.payment.documentType = 'invoice'; slip.payment.method = 'Cash'; slip.payment.customDocumentType = ''; slip.payment.customPaymentMethod = ''
+    expect(validateSlip(slip)['payment.customDocumentType']).toBeUndefined(); expect(validateSlip(slip)['payment.customPaymentMethod']).toBeUndefined()
+  })
 })

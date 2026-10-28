@@ -1,7 +1,10 @@
+import { buildDesignerPdf } from './designerPdf'
+import { parseCustomDesign } from './customDesigns'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { PaymentSlip } from '../types'
 import { buildPaymentSlipView } from './paymentSlipView'
+import { getDocumentTypeLabel, safeFilenameSlug } from './documentIdentity'
 
 type PaymentSlipView = ReturnType<typeof buildPaymentSlipView>
 export type PdfPageMetrics = {
@@ -19,10 +22,9 @@ export type PdfPageMetrics = {
   orientation: 'portrait' | 'landscape'
 }
 
-const safeName = (value: string) => value.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Recipient'
 const hexToRgb = (hex: string): [number, number, number] => { const clean = /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : '0b1f3a'; return [Number.parseInt(clean.slice(0, 2), 16), Number.parseInt(clean.slice(2, 4), 16), Number.parseInt(clean.slice(4, 6), 16)] }
 const addContainedLogo = (doc: jsPDF, data: string, format: 'PNG' | 'JPEG', x: number, y: number, box: number) => { const properties = doc.getImageProperties(data); const ratio = properties.width / properties.height; const width = ratio >= 1 ? box : box * ratio; const height = ratio >= 1 ? box / ratio : box; doc.addImage(data, format, x + (box - width) / 2, y + (box - height) / 2, width, height, undefined, 'FAST') }
-export const pdfFilename = (slip: PaymentSlip) => `Payment-Slip-${safeName(slip.payment.reference)}-${safeName(slip.recipient.name)}.pdf`
+export const pdfFilename = (slip: PaymentSlip) => `${safeFilenameSlug(getDocumentTypeLabel(slip))}-${safeFilenameSlug(slip.payment.reference, false)}.pdf`
 
 export function getPdfPageMetrics(doc: jsPDF, orientation: PdfPageMetrics['orientation']): PdfPageMetrics {
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -43,7 +45,8 @@ const splitLines = (doc: jsPDF, value: string, width: number) => value.split(/\r
 const lineBlockHeight = (lines: string[], lineHeight: number) => Math.max(1, lines.length) * lineHeight
 export const getPdfTableColumnWidths = (contentWidth: number) => [contentWidth * 0.05, contentWidth * 0.5, contentWidth * 0.09, contentWidth * 0.17, contentWidth * 0.19]
 
-export function buildPdf(slip: PaymentSlip) {
+export function buildPdf(slip: PaymentSlip, options: { showBranding?: boolean } = {}) {
+  if (parseCustomDesign(slip.payment.customDesign)?.blocks) return buildDesignerPdf(slip, options.showBranding !== false)
   const view = buildPaymentSlipView(slip)
   const orientation = slip.payment.orientation || 'portrait'
   const doc = new jsPDF({ unit: 'mm', format: slip.payment.paperSize || 'a4', orientation })
@@ -52,20 +55,21 @@ export function buildPdf(slip: PaymentSlip) {
   const landscape = orientation === 'landscape'
   const { compact, footerHeight, contentBottom } = layout
   const navy: [number, number, number] = hexToRgb(view.themeColor)
+  const foreground: [number, number, number] = navy[0] * .299 + navy[1] * .587 + navy[2] * .114 > 155 ? [11, 31, 58] : [255, 255, 255]
   const muted: [number, number, number] = [91, 105, 124]
   const bodySize = compact ? 6.4 : 8
   const bodyLine = compact ? 3.3 : 4.2
   const labelSize = compact ? 5.5 : 6.8
   const sectionGap = compact ? 5 : 7
-  const addTopBar = () => { doc.setFillColor(...navy); doc.rect(0, 0, pageWidth, 4, 'F') }
+  const addTopBar = () => { doc.setFillColor(...navy); if (view.payment.template === 'minimal') return; if (view.payment.template === 'modern') doc.rect(0, 0, 4, pageHeight, 'F'); else doc.rect(0, 0, pageWidth, 4, 'F') }
   const addContinuationPage = (title: string) => {
     doc.addPage(slip.payment.paperSize || 'a4', orientation)
     addTopBar()
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 8 : 10); doc.setTextColor(...navy); doc.text(title, marginX, layout.marginTop + 5)
+    doc.setFont(view.font, 'bold'); doc.setFontSize(compact ? 8 : 10); doc.setTextColor(...navy); doc.text(title, marginX, layout.marginTop + 5)
     return layout.marginTop + (compact ? 15 : 19)
   }
   const ensureSpace = (y: number, height: number, title: string) => y + height <= contentBottom ? y : addContinuationPage(title)
-  const drawLabel = (label: string, x: number, y: number) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text(label, x, y) }
+  const drawLabel = (label: string, x: number, y: number) => { doc.setFont(view.font, 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text(label, x, y) }
 
   addTopBar()
   let y = layout.marginTop
@@ -74,44 +78,50 @@ export function buildPdf(slip: PaymentSlip) {
   let companyX = marginX
   if (view.company.logo) { addContainedLogo(doc, view.company.logo, view.company.logoFormat, marginX, y, logoSize); companyX += logoSize + 6 }
   const companyTextWidth = companyWidth - (companyX - marginX)
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 11 : 14); doc.setTextColor(...navy)
+  doc.setFont(view.font, 'bold'); doc.setFontSize(compact ? 11 : 14); doc.setTextColor(...navy)
   const companyName = splitLines(doc, view.company.name, companyTextWidth); doc.text(companyName, companyX, y + 5)
   let companyY = y + 5 + lineBlockHeight(companyName, compact ? 4.2 : 5.2)
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(compact ? 6.2 : 7.5); doc.setTextColor(...muted)
+  doc.setFont(view.font, 'normal'); doc.setFontSize(compact ? 6.2 : 7.5); doc.setTextColor(...muted)
   const companyDetails = [view.company.address, view.company.contacts.replace('·', '|'), view.company.registration].filter(Boolean).flatMap(value => splitLines(doc, value, companyTextWidth))
   if (companyDetails.length) { doc.text(companyDetails, companyX, companyY); companyY += lineBlockHeight(companyDetails, compact ? 3.1 : 3.8) }
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 8 : 11); doc.setTextColor(...navy); doc.text('PAYMENT', pageWidth - marginX, y + 4, { align: 'right' }); doc.setFontSize(compact ? 17 : 24); doc.text('SLIP', pageWidth - marginX, y + (compact ? 14 : 17), { align: 'right' })
-  y = Math.max(companyY, y + logoSize, y + (compact ? 18 : 24)) + sectionGap
+  const headingWidth = contentWidth - companyWidth - 4
+  const headingSize = view.payment.documentHeading.length > 24 ? (compact ? 8 : 12) : (compact ? 14 : 20)
+  doc.setFont(view.font, 'bold'); doc.setFontSize(headingSize); doc.setTextColor(...navy)
+  const headingLines = splitLines(doc, view.payment.documentHeading, headingWidth)
+  const headingLine = headingSize * 0.38
+  doc.text(headingLines, pageWidth - marginX, y + headingLine, { align: 'right' })
+  const headingBottom = y + lineBlockHeight(headingLines, headingLine)
+  y = Math.max(companyY, y + logoSize, headingBottom) + sectionGap
   doc.setDrawColor(215, 222, 230); doc.line(marginX, y, pageWidth - marginX, y); y += sectionGap
 
   const recipientWidth = landscape ? contentWidth * 0.43 : contentWidth * 0.58
   const metaLeft = marginX + (landscape ? contentWidth * 0.5 : contentWidth * 0.65)
   const metaWidth = pageWidth - marginX - metaLeft
   drawLabel('PAYMENT TO', marginX, y)
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(compact ? 9 : 12); doc.setTextColor(...navy)
+  doc.setFont(view.font, 'bold'); doc.setFontSize(compact ? 9 : 12); doc.setTextColor(...navy)
   const recipientName = splitLines(doc, view.recipient.name, recipientWidth); doc.text(recipientName, marginX, y + bodyLine)
   let recipientY = y + bodyLine + lineBlockHeight(recipientName, bodyLine)
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...muted)
+  doc.setFont(view.font, 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...muted)
   const recipientDetails = view.recipient.details.flatMap(detail => splitLines(doc, detail, recipientWidth)); if (recipientDetails.length) { doc.text(recipientDetails, marginX, recipientY); recipientY += lineBlockHeight(recipientDetails, bodyLine) }
   const meta = [['REFERENCE', view.payment.reference], ['PAYMENT DATE', view.payment.date], ['PAYMENT METHOD', view.payment.method]] as const
   let metaBottom = y
   if (landscape) {
     const columnWidth = metaWidth / 3
-    meta.forEach(([label, value], index) => { const left = metaLeft + index * columnWidth; drawLabel(label, left, y); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const lines = splitLines(doc, value, columnWidth - 5); doc.text(lines, left, y + bodyLine); metaBottom = Math.max(metaBottom, y + bodyLine + lineBlockHeight(lines, bodyLine)) })
+    meta.forEach(([label, value], index) => { const left = metaLeft + index * columnWidth; drawLabel(label, left, y); doc.setFont(view.font, 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const lines = splitLines(doc, value, columnWidth - 5); doc.text(lines, left, y + bodyLine); metaBottom = Math.max(metaBottom, y + bodyLine + lineBlockHeight(lines, bodyLine)) })
   } else {
     let metaY = y
-    meta.forEach(([label, value]) => { drawLabel(label, metaLeft, metaY); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const lines = splitLines(doc, value, metaWidth); doc.text(lines, pageWidth - marginX, metaY + bodyLine, { align: 'right' }); metaY += bodyLine + lineBlockHeight(lines, bodyLine) + 2 })
+    meta.forEach(([label, value]) => { drawLabel(label, metaLeft, metaY); doc.setFont(view.font, 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const lines = splitLines(doc, value, metaWidth); doc.text(lines, pageWidth - marginX, metaY + bodyLine, { align: 'right' }); metaY += bodyLine + lineBlockHeight(lines, bodyLine) + 2 })
     metaBottom = metaY
   }
   y = Math.max(recipientY, metaBottom) + sectionGap
 
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); const purposeLines = splitLines(doc, view.payment.title, contentWidth - 10)
+  doc.setFont(view.font, 'bold'); doc.setFontSize(bodySize); const purposeLines = splitLines(doc, view.payment.title, contentWidth - 10)
   const purposeHeight = lineBlockHeight(purposeLines, bodyLine) + (compact ? 9 : 11)
   y = ensureSpace(y, purposeHeight, 'PAYMENT DETAILS')
-  doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentWidth, purposeHeight, 2, 2, 'F'); drawLabel('PAYMENT FOR', marginX + 5, y + (compact ? 4 : 5)); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(purposeLines, marginX + 5, y + (compact ? 8 : 10)); y += purposeHeight + sectionGap
+  doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentWidth, purposeHeight, 2, 2, 'F'); drawLabel('PAYMENT FOR', marginX + 5, y + (compact ? 4 : 5)); doc.setFont(view.font, 'bold'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(purposeLines, marginX + 5, y + (compact ? 8 : 10)); y += purposeHeight + sectionGap
 
   const tableWidths = getPdfTableColumnWidths(contentWidth)
-  autoTable(doc, { startY: y, margin: { left: marginX, right: marginX, bottom: pageHeight - contentBottom, top: layout.marginTop + 10 }, showHead: 'everyPage', rowPageBreak: 'avoid', head: [['#', 'Description', 'Qty', 'Rate', 'Amount']], body: view.items.map(item => [item.index, item.description, item.quantity, item.rate, item.amount]), theme: 'plain', headStyles: { fillColor: navy, textColor: 255, fontSize: compact ? 6.2 : 8, cellPadding: compact ? 1.6 : 3 }, bodyStyles: { textColor: [45, 55, 68], fontSize: compact ? 6.2 : 8.5, cellPadding: compact ? 1.5 : 3, lineColor: [226, 230, 235], lineWidth: { bottom: .15 } }, columnStyles: { 0: { cellWidth: tableWidths[0] }, 1: { cellWidth: tableWidths[1] }, 2: { halign: 'right', cellWidth: tableWidths[2] }, 3: { halign: 'right', cellWidth: tableWidths[3] }, 4: { halign: 'right', cellWidth: tableWidths[4] } } })
+  autoTable(doc, { startY: y, margin: { left: marginX, right: marginX, bottom: pageHeight - contentBottom, top: layout.marginTop + 10 }, showHead: 'everyPage', rowPageBreak: 'avoid', head: [['#', 'Description', 'Qty', 'Rate', 'Amount']], body: view.items.map(item => [item.index, item.description, item.quantity, item.rate, item.amount]), theme: 'plain', styles: { font: view.font }, headStyles: { fillColor: view.payment.template === 'classic' ? navy : [240, 243, 247], textColor: view.payment.template === 'classic' ? foreground : navy, fontSize: compact ? 6.2 : 8, cellPadding: compact ? 1.6 : 3 }, bodyStyles: { textColor: [45, 55, 68], fontSize: compact ? 6.2 : 8.5, cellPadding: compact ? 1.5 : 3, lineColor: [226, 230, 235], lineWidth: { bottom: .15 } }, columnStyles: { 0: { cellWidth: tableWidths[0] }, 1: { cellWidth: tableWidths[1] }, 2: { halign: 'right', cellWidth: tableWidths[2] }, 3: { halign: 'right', cellWidth: tableWidths[3] }, 4: { halign: 'right', cellWidth: tableWidths[4] } } })
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + sectionGap
 
   const totalsWidth = landscape ? contentWidth * 0.34 : contentWidth * 0.38
@@ -123,11 +133,11 @@ export function buildPdf(slip: PaymentSlip) {
   const measuredRows = totalRows.map(([label, amount]) => ({ label: splitLines(doc, label, totalLabelWidth), amount }))
   const summaryHeight = Math.max(bodyLine + lineBlockHeight(wordsLines, bodyLine), measuredRows.reduce((height, row) => height + Math.max(bodyLine, lineBlockHeight(row.label, bodyLine)), 0) + (compact ? 11 : 14))
   y = ensureSpace(y, summaryHeight, 'PAYMENT SUMMARY')
-  drawLabel('AMOUNT IN WORDS', marginX, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(wordsLines, marginX, y + bodyLine)
+  drawLabel('AMOUNT IN WORDS', marginX, y); doc.setFont(view.font, 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(wordsLines, marginX, y + bodyLine)
   let totalsY = y
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...muted)
+  doc.setFont(view.font, 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...muted)
   measuredRows.forEach(row => { const height = Math.max(bodyLine, lineBlockHeight(row.label, bodyLine)); doc.text(row.label, totalsLeft, totalsY); doc.text(row.amount, pageWidth - marginX, totalsY, { align: 'right' }); totalsY += height })
-  const grandHeight = compact ? 9 : 12; doc.setFillColor(...navy); doc.roundedRect(totalsLeft, totalsY + 2, totalsWidth, grandHeight, 2, 2, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.text('TOTAL', totalsLeft + 5, totalsY + 2 + grandHeight * 0.65); doc.text(view.totals.final, pageWidth - marginX - 5, totalsY + 2 + grandHeight * 0.65, { align: 'right' })
+  const grandHeight = compact ? 9 : 12; doc.setFillColor(...navy); doc.roundedRect(totalsLeft, totalsY + 2, totalsWidth, grandHeight, 2, 2, 'F'); doc.setTextColor(...foreground); doc.setFont(view.font, 'bold'); doc.text('TOTAL', totalsLeft + 5, totalsY + 2 + grandHeight * 0.65); doc.text(view.totals.final, pageWidth - marginX - 5, totalsY + 2 + grandHeight * 0.65, { align: 'right' })
   y += summaryHeight + sectionGap
 
   const flowSection = (label: string, value: string) => {
@@ -138,9 +148,9 @@ export function buildPdf(slip: PaymentSlip) {
       y = ensureSpace(y, bodyLine * 2 + 2, `${label}${continued ? ' (CONTINUED)' : ''}`)
       const capacity = Math.max(1, Math.floor((contentBottom - y - bodyLine - 2) / bodyLine))
       const pageLines = lines.slice(0, capacity); lines = lines.slice(capacity)
-      drawLabel(`${label}${continued ? ' (CONTINUED)' : ''}`, marginX, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(pageLines, marginX, y + bodyLine)
+      drawLabel(`${label}${continued ? ' (CONTINUED)' : ''}`, marginX, y); doc.setFont(view.font, 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); doc.text(pageLines, marginX, y + bodyLine)
       y += bodyLine + lineBlockHeight(pageLines, bodyLine) + sectionGap
-      if (lines.length) { y = addContinuationPage('PAYMENT SLIP - CONTINUED'); continued = true }
+      if (lines.length) { y = addContinuationPage(`${view.payment.documentHeading} - CONTINUED`); continued = true }
     }
   }
   flowSection('BANK', view.payment.bankName)
@@ -150,23 +160,23 @@ export function buildPdf(slip: PaymentSlip) {
   const signatureHeight = compact ? 30 : 38
   y = ensureSpace(y, signatureHeight, 'ACKNOWLEDGEMENT')
   const signatureStart = y
-  doc.setFont('helvetica', 'italic'); doc.setFontSize(bodySize); doc.setTextColor(...muted); doc.text('I acknowledge receipt of the payment stated above.', marginX, y); y += compact ? 11 : 14
+  doc.setFont(view.font, 'italic'); doc.setFontSize(bodySize); doc.setTextColor(...muted); doc.text('I acknowledge receipt of the payment stated above.', marginX, y); y += compact ? 11 : 14
   const signatureGap = landscape ? contentWidth * 0.04 : contentWidth * 0.06
   const signatureWidth = (contentWidth - signatureGap * 2) / 3
   const signatures = [[view.company.authorizedName, 'Prepared By', view.company.authorizedDesignation], ['', 'Recipient Signature', ''], ['', 'Signature Date', '']] as const
-  signatures.forEach(([name, label, designation], index) => { const left = marginX + index * (signatureWidth + signatureGap); doc.setFont('helvetica', 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const nameLines = splitLines(doc, name, signatureWidth); if (name) doc.text(nameLines, left, y); const lineY = y + Math.max(bodyLine, lineBlockHeight(nameLines, bodyLine)) + 1; doc.setDrawColor(130, 140, 152); doc.line(left, lineY, left + signatureWidth, lineY); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text(label, left, lineY + bodyLine); if (designation) doc.text(splitLines(doc, designation, signatureWidth), left, lineY + bodyLine * 2) })
+  signatures.forEach(([name, label, designation], index) => { const left = marginX + index * (signatureWidth + signatureGap); doc.setFont(view.font, 'normal'); doc.setFontSize(bodySize); doc.setTextColor(...navy); const nameLines = splitLines(doc, name, signatureWidth); if (name) doc.text(nameLines, left, y); const lineY = y + Math.max(bodyLine, lineBlockHeight(nameLines, bodyLine)) + 1; doc.setDrawColor(130, 140, 152); doc.line(left, lineY, left + signatureWidth, lineY); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text(label, left, lineY + bodyLine); if (designation) doc.text(splitLines(doc, designation, signatureWidth), left, lineY + bodyLine * 2) })
   y = signatureStart + signatureHeight
   if (view.payment.sealText) {
     const sealLines = splitLines(doc, view.payment.sealText.toUpperCase(), Math.min(50, contentWidth * 0.3))
     const sealHeight = lineBlockHeight(sealLines, bodyLine) + 8; y = ensureSpace(y, sealHeight, 'SEAL')
     const sealWidth = Math.min(58, contentWidth * 0.34); const sealX = pageWidth - marginX - sealWidth / 2
-    doc.setDrawColor(...navy); doc.setTextColor(...navy); doc.ellipse(sealX, y + sealHeight / 2, sealWidth / 2, sealHeight / 2); doc.setFont('helvetica', 'bold'); doc.setFontSize(bodySize); doc.text(sealLines, sealX, y + 5, { align: 'center' })
+    doc.setDrawColor(...navy); doc.setTextColor(...navy); doc.ellipse(sealX, y + sealHeight / 2, sealWidth / 2, sealHeight / 2); doc.setFont(view.font, 'bold'); doc.setFontSize(bodySize); doc.text(sealLines, sealX, y + 5, { align: 'center' })
   }
 
   const pages = doc.getNumberOfPages()
   for (let page = 1; page <= pages; page += 1) {
     const footerY = getPdfFooterBaseline(layout)
-    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); doc.text('Generated with Sliply', marginX, footerY); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, footerY - (referenceLines.length - 1) * bodyLine, { align: 'right' })
+    doc.setPage(page); doc.setFillColor(245, 247, 250); doc.rect(0, pageHeight - footerHeight, pageWidth, footerHeight, 'F'); doc.setFont(view.font, 'normal'); doc.setFontSize(labelSize); doc.setTextColor(...muted); if (options.showBranding !== false) doc.text('Generated with Sliply', marginX, footerY); const referenceLines = splitLines(doc, view.payment.rawReference, contentWidth * 0.45); doc.text(referenceLines, pageWidth - marginX, footerY - (referenceLines.length - 1) * bodyLine, { align: 'right' })
   }
   return doc
 }
