@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   recipients: 'payment-slip-recipients',
   history: 'payment-slip-history',
   settings: 'payment-slip-settings',
+  attribution: 'payment-slip-attribution',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -240,6 +241,9 @@ export const loadSettings = (storage: Storage): AppSettings => {
   }
   return { ...DEFAULT_SETTINGS, theme: loadLegacyTheme(storage) ?? DEFAULT_SETTINGS.theme }
 }
+/** Pro-only browser preference: true keeps the “Generated with Sliply” footer (the default). */
+export const loadShowAttribution = (storage: Storage) => safeGet(storage, STORAGE_KEYS.attribution) !== 'hidden'
+export const saveShowAttribution = (storage: Storage, show: boolean) => show ? safeRemove(storage, STORAGE_KEYS.attribution) : safeSet(storage, STORAGE_KEYS.attribution, 'hidden')
 export const saveSettings = (storage: Storage, settings: AppSettings) => safeSet(storage, STORAGE_KEYS.settings, JSON.stringify(envelope(settings)))
 export const loadTheme = (storage: Storage): 'light' | 'dark' | null => { const theme = loadSettings(storage).theme; return theme === 'system' ? null : theme }
 export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => saveSettings(storage, { ...loadSettings(storage), theme })

@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react'
 import type { Errors, PaymentSlip, PaymentStatus, SavedRecipient, WorkflowStep } from '../../types'
 import { calculatePaymentTotals, currencies, formatCurrency } from '../../utils/currency'
 import { changePaymentStatus, paymentStatusLabels, paymentStatuses } from '../../utils/paymentStatus'
+import { normalizeLogo } from '../../utils/logoImage'
 import { Field, Input, Select, TextArea } from '../common/Field'
 
 interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; quickMode: boolean; hasCompanyProfile: boolean; savedRecipients: SavedRecipient[]; selectedRecipientId: string; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onClearCompany: () => void; onSelectRecipient: (id: string) => void; onSaveRecipient: () => void; onDeleteRecipient: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
@@ -15,9 +16,10 @@ export function SlipForm({ slip, errors, step, quickMode, hasCompanyProfile, sav
   const numericValue = (value: string) => value === '' ? '' : Number(value)
   const logo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return
+    event.target.value = ''
     if (!file.type.startsWith('image/')) return onLogoError('Please select an image file.')
-    if (file.size > 2 * 1024 * 1024) return onLogoError('Logo must be smaller than 2 MB.')
-    const reader = new FileReader(); reader.onload = () => set('company', 'logo', String(reader.result)); reader.readAsDataURL(file)
+    // Same normalisation as the cloud: at most 600 px, PNG (JPEG fallback), 512 KB, so browser and cloud documents share logos.
+    normalizeLogo(file).then(url => onChange({ ...slip, company: { ...slip.company, logo: url, logoId: undefined } }), reason => onLogoError(reason instanceof Error ? reason.message : 'Could not use that logo.'))
   }
   const setItem = (i: number, key: string, value: string | number) => onChange({ ...slip, items: slip.items.map((item, index) => index === i ? { ...item, [key]: value } : item) })
   const setAdjustment = (i: number, key: string, value: string | number) => onChange({ ...slip, adjustments: slip.adjustments.map((entry, index) => index === i ? { ...entry, [key]: value } : entry) })

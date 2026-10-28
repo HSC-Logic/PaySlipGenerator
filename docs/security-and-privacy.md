@@ -2,9 +2,9 @@
 
 ## Configuration and sessions
 
-The Supabase URL, anonymous/publishable key, Google OAuth client ID, and Vite base path are public frontend configuration. Service-role keys, database passwords, email-provider keys, OAuth client secrets, and other private credentials must never be exposed through `VITE_` variables.
+The Slipy API URL, Cognito user pool and client IDs, Google OAuth client ID, and Vite base path are public frontend configuration. Service-role keys, database passwords, email-provider keys, OAuth client secrets, and other private credentials must never be exposed through `VITE_` variables.
 
-Supabase manages browser session persistence and refresh. Application code does not copy tokens to custom storage keys. Google Drive authorization is separate and memory-only.
+Amazon Cognito (`amazon-cognito-identity-js`) manages browser session persistence and refresh, and the access token is sent to the Slipy API as a bearer token. Application code does not copy tokens to custom storage keys. Google Drive authorization is separate and memory-only.
 
 ## Authorization
 
@@ -18,6 +18,6 @@ The legacy editor accepts image files up to 2 MB and stores Base64 locally. Clou
 
 ## Data and deletion
 
-Guest data stays in browser storage unless cloud import is explicitly accepted. Import never deletes local data. Cloud records live in the configured Supabase project and may be archived in the app. Full account/cloud-data deletion currently requires administrator support and must be disclosed before production.
+Guest data stays in browser storage unless cloud import is explicitly accepted. Import never deletes local data. Cloud records (Pro only) live in the Slipy API database. Pro customers can download all of their data and delete their Slipy data from account settings; the HSClogic account is kept. Lapsed customers can download during the 14-day grace period, after which data is archived for 24 months and obtained through HSClogic support.
 
 Known limitations include no enterprise audit log, automatic conflict merging, cloud logo upload, or self-service account deletion. Email and signatures remain outside Phase 1. Hosted RLS and concurrency require project-level verification.

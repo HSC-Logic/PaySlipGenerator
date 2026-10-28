@@ -2,9 +2,9 @@
 
 A browser-based payment-slip workspace for creating professional payment records. Sliply is built with React, TypeScript, and Vite and is designed for free hosting on GitHub Pages. PDF generation, printing, draft storage, and calculations work without a backend.
 
-Sliply now has an optional Phase 1 cloud foundation. Guest users keep the complete local creation workflow without an account. When Supabase is configured, signed-in users can manage cloud companies and recipients, store payment snapshots, search history, and access records across devices. Cloud use is optional and local data is imported only after explicit consent.
+Sliply now has an optional Phase 1 cloud foundation. Guest users keep the complete local creation workflow without an account. Slipy Pro accounts (HSClogic sign-in plus the Slipy API) can manage cloud companies and recipients, store payment snapshots, search history, and access records across devices. Free accounts keep everything in the browser with no limits.
 
-See [architecture](docs/architecture.md), [Supabase setup](docs/supabase-setup.md), [security and privacy](docs/security-and-privacy.md), and [Phase 1 QA](docs/phase-1-qa.md).
+See [architecture](docs/architecture.md), [security and privacy](docs/security-and-privacy.md), and [Phase 1 QA](docs/phase-1-qa.md).
 
 ## Features
 

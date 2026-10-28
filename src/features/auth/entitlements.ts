@@ -1,8 +1,9 @@
 export type Plan = 'free' | 'pro'
-export type Capability = 'cloudHistory' | 'multipleCompanies' | 'unlimitedRecipients' | 'customBranding' | 'removeSliplyBranding'
+/** `cloud` covers sync, history, companies, recipients and designs on the Slipy API; the server enforces it too. */
+export type Capability = 'cloud' | 'removeSliplyBranding' | 'googleDrive'
 const matrix: Record<Plan, Record<Capability, boolean>> = {
-  free: { cloudHistory: false, multipleCompanies: false, unlimitedRecipients: false, customBranding: false, removeSliplyBranding: false },
-  pro: { cloudHistory: true, multipleCompanies: true, unlimitedRecipients: true, customBranding: true, removeSliplyBranding: true },
+  free: { cloud: false, removeSliplyBranding: false, googleDrive: false },
+  pro: { cloud: true, removeSliplyBranding: true, googleDrive: true },
 }
 export const normalizePlan = (value: unknown): Plan => value === 'pro' ? 'pro' : 'free'
 export const can = (plan: unknown, capability: Capability) => matrix[normalizePlan(plan)][capability]

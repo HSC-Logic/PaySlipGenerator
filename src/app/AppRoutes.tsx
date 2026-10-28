@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import App from '../App'
 import { AuthForm } from '../components/auth/AuthForm'
 import { ProtectedRoute } from '../components/auth/ProtectedRoute'
+import { ProGate } from '../components/auth/ProGate'
 import { CloudShell } from '../components/layout/CloudShell'
 import { DashboardPage } from '../components/dashboard/DashboardPage'
 import { CompaniesPage } from '../components/companies/CompaniesPage'
@@ -13,4 +14,4 @@ import { NewCloudPaymentPage } from '../components/payments/NewCloudPaymentPage'
 import { CloudSettingsPage } from '../components/settings/CloudSettingsPage'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import { PlansPage } from '../components/plans/PlansPage'
-export function AppRoutes(){return <HashRouter><AuthProvider><Routes><Route path="/" element={<App/>}/><Route path="/plans" element={<PlansPage/>}/><Route path="/login" element={<AuthForm mode="login"/>}/><Route path="/forgot-password" element={<AuthForm mode="forgot"/>}/><Route element={<ProtectedRoute><CloudShell/></ProtectedRoute>}><Route path="/dashboard" element={<DashboardPage/>}/><Route path="/payments" element={<PaymentsPage/>}/><Route path="/payments/new" element={<NewCloudPaymentPage/>}/><Route path="/payments/:id" element={<PaymentDetailPage/>}/><Route path="/payments/:id/edit" element={<CloudPaymentEditPage/>}/><Route path="/companies" element={<CompaniesPage/>}/><Route path="/recipients" element={<RecipientsPage/>}/><Route path="/settings" element={<CloudSettingsPage/>}/></Route><Route path="*" element={<Navigate to="/" replace/>}/></Routes></AuthProvider></HashRouter>}
+export function AppRoutes(){return <HashRouter><AuthProvider><Routes><Route path="/" element={<App/>}/><Route path="/plans" element={<PlansPage/>}/><Route path="/login" element={<AuthForm mode="login"/>}/><Route path="/forgot-password" element={<AuthForm mode="forgot"/>}/><Route element={<ProtectedRoute><CloudShell/></ProtectedRoute>}><Route element={<ProGate/>}><Route path="/dashboard" element={<DashboardPage/>}/><Route path="/payments" element={<PaymentsPage/>}/><Route path="/payments/new" element={<NewCloudPaymentPage/>}/><Route path="/payments/:id" element={<PaymentDetailPage/>}/><Route path="/payments/:id/edit" element={<CloudPaymentEditPage/>}/><Route path="/companies" element={<CompaniesPage/>}/><Route path="/recipients" element={<RecipientsPage/>}/></Route><Route path="/settings" element={<CloudSettingsPage/>}/></Route><Route path="*" element={<Navigate to="/" replace/>}/></Routes></AuthProvider></HashRouter>}

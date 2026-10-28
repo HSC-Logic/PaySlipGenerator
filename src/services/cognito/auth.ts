@@ -71,6 +71,14 @@ export const getAccessToken = async () => {
   return session.getAccessToken().getJwtToken()
 }
 
+export type AccessContext = { token: string; pro: boolean; lapsed: boolean }
+/** Access token plus the plan groups it carries, so callers can refuse to hit the API without `slipy-pro`. */
+export const getAccessContext = async (): Promise<AccessContext> => {
+  const session = await currentSession()
+  if (!session) throw new Error('Your session expired. Sign in again.')
+  return { token: session.getAccessToken().getJwtToken(), pro: planFromSession(session) === 'pro', lapsed: isLapsed(session) }
+}
+
 export const signOut = () => pool?.getCurrentUser()?.signOut()
 
 export const requestPasswordReset = (email: string) => new Promise<void>((resolve, reject) =>
