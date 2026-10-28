@@ -35,4 +35,9 @@ describe('cloud mapping', () => {
     expect(record).toMatchObject({ createdAt: Date.parse('2026-10-01T00:00:00Z'), updatedAt: 1760000000000, recipientId: null, archivedAt: null, version: 7 })
     expect(record.slip.items).toEqual([]); expect(record.slip.company).toMatchObject({ logo: '', logoId: 'l1' })
   })
+  it('reads import review flags and the totals the browser had stored', () => {
+    const read = recordFromDto({ id: 'p1', companyId: 'c1', referenceConflict: true, totalsDiffer: true, importedTotals: { subtotal: 3000, finalTotal: 2999.5 }, slip: {} })
+    expect(read).toMatchObject({ referenceConflict: true, totalsDiffer: true, importedTotals: { subtotal: 3000, finalTotal: 2999.5 } })
+    expect(recordFromDto({ id: 'p2', companyId: 'c1', slip: {} })).not.toHaveProperty('referenceConflict')
+  })
 })

@@ -4,6 +4,7 @@ import { useAuth } from '../../features/auth/AuthProvider'
 import { downloadAccountExport, deleteSlipyData, supportMailto } from '../../features/account/accountData'
 import { ApiError, fetchMe, type Me } from '../../services/api/client'
 import { cloudDataEnabled } from '../../services/cloud'
+import { BrowserTransferPanel } from '../dashboard/BrowserTransferPanel'
 import { LAPSED_NOTICE, UpgradePanel } from '../common/UpgradePanel'
 
 const messageOf = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback
@@ -38,6 +39,7 @@ function ProData({ userId }: { userId: string }) {
   const [me, setMe] = useState<Me | null>(null)
   useEffect(() => { fetchMe().then(setMe).catch(() => setMe(null)) }, [])
   return <section className="settings-card"><h2>Your Slipy data</h2><p>Payments, companies, recipients and logos are stored in your Slipy cloud. You can take a full copy or remove it at any time.</p>
+    <BrowserTransferPanel variant="settings" />
     <ExportButton />{!!me?.archives?.length && <p>You have {me.archives.length} earlier archive{me.archives.length > 1 ? 's' : ''} (latest {new Date(me.archives[me.archives.length - 1].createdAt).toLocaleDateString()}). <a href={supportMailto('archived-data', userId)}>Request my archived data</a></p>}
     <DeleteData userId={userId} /></section>
 }

@@ -5,7 +5,7 @@ export const apiConfigured = Boolean(base)
 
 const PROBLEM_BASE = 'https://slipy.hsclogic.link/problems/'
 const KINDS = [
-  'unauthorized', 'pro-required', 'rate-limited', 'temporarily-unavailable', 'reference-taken', 'data-archived', 'conflict', 'name-taken', 'validation', 'not-found',
+  'unauthorized', 'pro-required', 'rate-limited', 'temporarily-unavailable', 'payload-too-large', 'reference-taken', 'data-archived', 'conflict', 'name-taken', 'validation', 'not-found',
   'drive-not-configured', 'drive-not-connected', 'drive-reconnect-required', 'drive-code-rejected', 'drive-folder-not-found', 'drive-unavailable', 'drive-invalid-request',
 ] as const
 export type ProblemKind = typeof KINDS[number] | 'unknown'

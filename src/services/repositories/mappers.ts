@@ -35,9 +35,11 @@ export const companyFromDto = (row: Record<string, any>): CloudCompany => ({
 export const recipientFromDto = (row: Record<string, any>): CloudRecipient => ({
   id: row.id, name: text(row.name), identification: text(row.identification), role: text(row.role), address: text(row.address), email: text(row.email), telephone: text(row.telephone), archivedAt: row.archivedAt ?? null, version: version(row.version), createdAt: timestamp(row.createdAt) || undefined, updatedAt: timestamp(row.updatedAt) || undefined,
 })
+const importedTotalsOf = (value: unknown) => { const row = (value ?? {}) as Record<string, unknown>; const subtotal = amount(row.subtotal), finalTotal = amount(row.finalTotal); return { ...(subtotal === undefined ? {} : { subtotal }), ...(finalTotal === undefined ? {} : { finalTotal }) } }
 export const recordFromDto = (row: Record<string, any>): CloudPaymentRecord => ({
   id: row.id, createdAt: timestamp(row.createdAt), updatedAt: timestamp(row.updatedAt), companyId: row.companyId, recipientId: row.recipientId ?? null, archivedAt: row.archivedAt ?? null, version: version(row.version),
   origin: typeof row.origin === 'string' ? row.origin : undefined, subtotal: amount(row.subtotal), finalTotal: amount(row.finalTotal),
+  ...(row.referenceConflict === true ? { referenceConflict: true } : {}), ...(row.totalsDiffer === true ? { totalsDiffer: true, importedTotals: importedTotalsOf(row.importedTotals) } : {}),
   slip: { ...row.slip, items: row.slip?.items ?? [], adjustments: row.slip?.adjustments ?? [], company: { ...row.slip?.company, logo: text(row.slip?.company?.logo) } },
 })
 

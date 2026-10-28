@@ -201,7 +201,8 @@ export const loadHistory = (storage: Storage, defaults: PaymentSlip): PaymentRec
     seen.add(id)
     const createdAt = wrapped && typeof entry.createdAt === 'number' && Number.isFinite(entry.createdAt) ? entry.createdAt : 0
     const updatedAt = wrapped && typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) ? entry.updatedAt : createdAt
-    return [{ id, createdAt, updatedAt, slip }]
+    const savedUnderPlan = wrapped && (entry.savedUnderPlan === 'free' || entry.savedUnderPlan === 'pro') ? entry.savedUnderPlan : undefined
+    return [{ id, createdAt, updatedAt, slip, ...(savedUnderPlan ? { savedUnderPlan } : {}) }]
   })
 }
 
