@@ -1,6 +1,6 @@
 # Sliply — Payment Slip Generator
 
-A browser-based payment-slip workspace for creating professional payment records. Sliply is built with React, TypeScript, and Vite and is designed for free hosting on GitHub Pages. PDF generation, printing, draft storage, and calculations work without a backend.
+A browser-based payment-slip workspace for creating professional payment records. Sliply is built with React, TypeScript, and Vite and is deployed as a static site to a VPS. PDF generation, printing, draft storage, and calculations work without a backend.
 
 Sliply now has an optional Phase 1 cloud foundation. Guest users keep the complete local creation workflow without an account. Slipy Pro accounts (HSClogic sign-in plus the Slipy API) can manage cloud companies and recipients, store payment snapshots, search history, and access records across devices. Free accounts keep everything in the browser with no limits.
 
@@ -23,7 +23,7 @@ See [architecture](docs/architecture.md), [security and privacy](docs/security-a
 - Searchable browser-local payment history with snapshot editing and duplication
 - Field-level validation, accessible labels, notices, and loading states
 - Optional Pro-only Google Drive saving (PDF upload and Google Docs creation) through the Slipy API
-- Automated calculation/reference tests and GitHub Pages deployment workflow
+- Automated calculation/reference tests and VPS deployment workflow
 
 ## Local development
 
@@ -47,19 +47,11 @@ npm run preview   # preview the production build
 
 PDF regression tests run as part of `npm test`. Before document-generation releases, complete the [manual PDF QA matrix](docs/pdf-manual-qa.md).
 
-For local development, set `VITE_BASE_PATH=/`. For a repository Pages site, use `/repository-name/`. A future custom domain should use `/`.
+For local development and VPS deployments, use `VITE_BASE_PATH=/`.
 
-## Deploy to GitHub Pages
+## Deploy to the VPS
 
-1. Push this project to GitHub with `main` as the deployment branch.
-2. Open the repository's **Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-4. Push to `main`, or open **Actions → Deploy to GitHub Pages → Run workflow**.
-5. When the workflow completes, the site is available at `https://USERNAME.github.io/REPOSITORY-NAME/`.
-
-Pages must be enabled once before the first workflow run. If `actions/configure-pages` reports `Get Pages site failed: Not Found`, open **Settings → Pages**, select **GitHub Actions** as the source, save the setting, and rerun the failed workflow. The standard workflow token cannot initialize a previously disabled Pages site automatically; the action's `enablement` option requires a separate elevated token, so this project intentionally uses the safer one-time settings step.
-
-The workflow calculates the correct Vite base path from the repository name. For a custom domain, add the domain in Pages settings and change the workflow's `VITE_BASE_PATH` to `/` (and add a `public/CNAME` file if appropriate).
+The `main` branch workflow builds the site, runs tests, and uploads `dist/` to `/var/www/slipy` through SSH/SCP. Configure the required GitHub Actions secret and variables, then follow [`docs/vps-deployment.md`](docs/vps-deployment.md) for VPS directory permissions, DNS, Caddy, and service operations.
 
 ## Enable Google Drive and Docs
 
@@ -69,9 +61,9 @@ The core application does not need Google configuration. Google Drive is a Slipy
 2. In **APIs & Services → Library**, enable **Google Drive API** and **Google Docs API**.
 3. Open **Google Auth Platform** and configure the OAuth consent screen. Add the app name, support email, developer contact, and any test users required while the app remains in testing.
 4. Create an OAuth client from **APIs & Services → Credentials → Create credentials → OAuth client ID** and choose **Web application**.
-5. Add both local development and the exact Pages origin as authorized JavaScript origins, for example:
+5. Add both local development and the exact production origin as authorized JavaScript origins, for example:
    - `http://localhost:5173`
-   - `https://USERNAME.github.io`
+   - `https://slipy.hsclogic.com`
 6. Copy the public client ID. The client secret belongs only in the Slipy API's environment; never include it in this client-side app.
 7. Locally, place it in an uncommitted `.env` file:
 
@@ -80,7 +72,7 @@ The core application does not need Google configuration. Google Drive is a Slipy
    VITE_BASE_PATH=/
    ```
 
-8. For GitHub Pages, add it as a repository variable named `VITE_GOOGLE_CLIENT_ID` under **Settings → Secrets and variables → Actions → Variables**. It is a public browser client identifier, not a secret.
+8. Add it as a repository variable named `VITE_GOOGLE_CLIENT_ID` under **Settings → Secrets and variables → Actions → Variables**. It is a public browser client identifier, not a secret.
 
 The integration requests only `drive.file`, which limits access to files created or explicitly opened by this application. The browser opens Google's consent popup (`initCodeClient`) and sends the one-time code to the Slipy API, which stores the refresh token encrypted. No Google token reaches the browser. Disconnecting revokes the token at Google through the API. Free accounts see an upgrade panel instead of the Drive tools.
 
