@@ -88,7 +88,7 @@ async function send(path: string, init: ApiInit, accept: string): Promise<Respon
     if (!access.pro && !(allowLapsed && access.lapsed)) throw proRequired()
     merged.set('Authorization', `Bearer ${access.token}`)
   }
-  if (rest.body && !merged.has('Content-Type')) merged.set('Content-Type', 'application/json')
+  if (typeof rest.body === 'string' && !merged.has('Content-Type')) merged.set('Content-Type', 'application/json')
   const response = await fetch(`${base}${path.startsWith('/') ? path : `/${path}`}`, { ...rest, headers: merged })
   if (!response.ok) {
     const error = await toApiError(response)

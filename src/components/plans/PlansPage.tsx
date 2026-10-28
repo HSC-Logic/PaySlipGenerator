@@ -5,8 +5,8 @@ import { BrandHeader, DeveloperMark } from '../common/BrandHeader'
 const features = [
   ['Create, preview, download and print documents', true, true],
   ['Everything in the browser, no limits: drafts, history, companies and recipients stay on your device', true, true],
-  ['Cloud sync of payments, companies and recipients across devices', false, true],
-  ['Google Drive PDF and Google Doc saving', false, true],
+  ['Cloud sync of payments, companies, recipients and saved designs across devices', false, true],
+  ['Google Drive: save PDFs and editable Google Docs to your own Drive through Slipy', false, true],
   ['Remove “Generated with Sliply” attribution', false, true],
 ] as const
 

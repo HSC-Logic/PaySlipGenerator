@@ -9,6 +9,6 @@ export function UpgradePanel({ feature = 'Cloud sync' }: { feature?: string }) {
   const auth = useAuth()
   if (!cloudDataEnabled) return <section className="settings-card upgrade-panel" role="status"><h2>{feature} is not available</h2><p>Cloud features are not configured for this deployment. Everything in the browser keeps working.</p><div className="quick-actions"><Link className="button secondary" to="/">Back to the editor</Link></div></section>
   return <section className="settings-card upgrade-panel" role="status"><h2>{feature} is a Slipy Pro feature</h2>
-    {auth.lapsed ? <p>{LAPSED_NOTICE}</p> : <p>Pro adds cloud sync for payments, companies and recipients across devices, Google Drive and attribution removal. The browser editor stays free, with no limits.</p>}
+    {auth.lapsed ? <p>{LAPSED_NOTICE}</p> : <p>Pro adds cloud sync for payments, companies, recipients and saved designs across devices, Google Drive and attribution removal. The browser editor stays free, with no limits.</p>}
     <div className="quick-actions"><Link className="button primary" to="/plans">{auth.lapsed ? 'Renew Slipy Pro' : 'See Slipy Pro'}</Link>{auth.lapsed && <Link className="button secondary" to="/settings">Download my data</Link>}<Link className="button secondary" to="/">Back to the editor</Link></div></section>
 }

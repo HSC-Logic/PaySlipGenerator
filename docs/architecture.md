@@ -14,7 +14,8 @@ Trust boundaries:
 - Cognito identifiers in `VITE_` variables are public configuration, not credentials.
 - The API validates the access token and enforces tenant isolation; the browser only interprets the plan.
 - Attribution removal is the one Pro feature enforced in the browser (PDFs are rendered client-side).
-- Drive authorization is still a separate in-memory Google token (a later workstream moves it behind the API).
+- Google Drive runs through the API (Pro only): the browser gets a one-time authorization code with `initCodeClient` and posts it to `POST /drive/connection`; the API stores the refresh token and performs every Drive call. The browser never holds a Google token.
+- Pro users keep saved PDF designs in the cloud (`/designs`); Free users keep them in `localStorage` (`payment-slip-custom-designs`).
 
 HashRouter keeps refreshes under `/PaySlipGenerator/` compatible with GitHub Pages. Cloud writes retain company and recipient snapshots on each payment.
 

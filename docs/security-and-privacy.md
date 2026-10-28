@@ -4,7 +4,7 @@
 
 The Slipy API URL, Cognito user pool and client IDs, Google OAuth client ID, and Vite base path are public frontend configuration. Service-role keys, database passwords, email-provider keys, OAuth client secrets, and other private credentials must never be exposed through `VITE_` variables.
 
-Amazon Cognito (`amazon-cognito-identity-js`) manages browser session persistence and refresh, and the access token is sent to the Slipy API as a bearer token. Application code does not copy tokens to custom storage keys. Google Drive authorization is separate and memory-only.
+Amazon Cognito (`amazon-cognito-identity-js`) manages browser session persistence and refresh, and the access token is sent to the Slipy API as a bearer token. Application code does not copy tokens to custom storage keys. Google Drive is connected through the API: the browser only receives a one-time Google authorization code, which the API exchanges and stores encrypted. No Google access or refresh token ever reaches the browser.
 
 ## Authorization
 
