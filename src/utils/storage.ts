@@ -1,6 +1,8 @@
+import { customDesignKey, parseCustomDesign } from './customDesigns'
 import type { AppSettings, Company, CompanyProfile, CurrencyCode, DocumentType, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
+  customDesigns: customDesignKey,
   company: 'payment-slip-company',
   draft: 'payment-slip-draft',
   theme: 'payment-slip-theme',
@@ -120,7 +122,7 @@ const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
  * supplied defaults; unknown fields are ignored. Core sections and items must
  * still have the expected runtime shape before a draft is accepted.
  */
-const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
+export const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
   if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment)) return null
   const company = companyFrom(value.company, defaults.company)
   if (!company) return null
@@ -162,6 +164,8 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
       status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
       adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], 'LKR'),
+      ...(parseCustomDesign(payment.customDesign) ? { customDesign: parseCustomDesign(payment.customDesign) } : {}),
+      ...(payment.template === undefined ? {} : { template: oneOf(payment.template, ['classic', 'minimal', 'modern'] as const, 'classic') }),
       sealText: text(payment.sealText, defaults.payment.sealText), paperSize: oneOf<PaperSize>(payment.paperSize, ['a4', 'a5', 'b5', 'letter'], defaults.payment.paperSize),
       orientation: oneOf<PageOrientation>(payment.orientation, ['portrait', 'landscape'], defaults.payment.orientation),
     },

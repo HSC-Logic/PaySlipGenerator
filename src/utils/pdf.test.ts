@@ -10,6 +10,17 @@ const formats = [
 ] as const
 
 describe('PDF document generation', () => {
+  it('exports every document design with its content intact', () => {
+    const outputs = ['classic', 'minimal', 'modern'].map(template => {
+      const slip = createBasicSlip()
+      slip.payment.template = template as 'classic' | 'minimal' | 'modern'
+      const output = buildPdf(slip).output()
+      expect(output).toContain(slip.payment.reference)
+      return output.split('endstream')[0]
+    })
+    expect(new Set(outputs).size).toBe(3)
+  })
+
   it('builds a reusable non-empty PDF without initiating a download', () => {
     const pdf = buildPdf(createBasicSlip())
     expect(pdf.output('arraybuffer').byteLength).toBeGreaterThan(3000)

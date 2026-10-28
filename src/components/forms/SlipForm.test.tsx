@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBasicSlip } from '../../test/fixtures/paymentSlips'
 import type { PaymentSlip } from '../../types'
@@ -13,7 +14,7 @@ afterEach(cleanup)
 function Harness({ initial, step = 'payment' }: { initial: PaymentSlip; step?: 'company' | 'recipient' | 'payment' }) {
   const [slip, setSlip] = useState(initial)
   const [quick, setQuick] = useState(true)
-  return <><button onClick={() => setQuick(value => !value)}>Switch mode</button><SlipForm slip={slip} errors={{}} step={step} quickMode={quick} hasCompanyProfile={Boolean(initial.company.name)} savedRecipients={[]} selectedRecipientId="" onChange={setSlip} {...handlers} /></>
+  return <MemoryRouter><button onClick={() => setQuick(value => !value)}>Switch mode</button><SlipForm slip={slip} errors={{}} step={step} quickMode={quick} hasCompanyProfile={Boolean(initial.company.name)} savedRecipients={[]} selectedRecipientId="" onChange={setSlip} {...handlers} /></MemoryRouter>
 }
 
 describe('Quick Slip interaction mode', () => {
