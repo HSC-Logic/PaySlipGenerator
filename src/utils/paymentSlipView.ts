@@ -1,6 +1,8 @@
+import { parseCustomDesign } from './customDesigns'
 import type { PaymentSlip } from '../types'
 import { calculatePaymentTotals, currencies, formatCurrency } from './currency'
 import { numberToWords } from './amountInWords'
+import { getDocumentHeading, getDocumentTypeLabel, getPaymentMethodLabel } from './documentIdentity'
 
 export const paperSizes = { a4: [210, 297], a5: [148, 210], b5: [176, 250], letter: [216, 279] } as const
 
@@ -11,6 +13,7 @@ export const formatPaymentDate = (date: string) => date && !Number.isNaN(Date.pa
 export const formatPaymentReference = (reference: string) => reference.trim() || '—'
 
 export function buildPaymentSlipView(slip: PaymentSlip) {
+  const customDesign = parseCustomDesign(slip.payment.customDesign)
   const calculation = calculatePaymentTotals(slip.items, slip.payment.adjustment, slip.adjustments)
   const base = calculation.subtotal
   const total = calculation.final
@@ -33,8 +36,9 @@ export function buildPaymentSlipView(slip: PaymentSlip) {
     },
     recipient: { name: slip.recipient.name || 'Recipient name', role: slip.recipient.role, details: recipientDetails },
     payment: {
+      template: customDesign?.layout || (['minimal', 'modern'] as const).find(template => template === slip.payment.template) || 'classic',
       reference: formatPaymentReference(slip.payment.reference), rawReference: slip.payment.reference, date: formatPaymentDate(slip.payment.date), rawDate: slip.payment.date,
-      method: slip.payment.method, title: slip.payment.title || 'Payment title or purpose', bankName: slip.payment.bankName,
+      documentLabel: getDocumentTypeLabel(slip), documentHeading: getDocumentHeading(slip), method: getPaymentMethodLabel(slip), title: slip.payment.title || 'Payment title or purpose', bankName: slip.payment.bankName,
       transactionReference: slip.payment.transactionReference, notes: slip.payment.notes, sealText: slip.payment.sealText,
       currency: slip.payment.currency, paperSize: slip.payment.paperSize, orientation: slip.payment.orientation,
     },
@@ -49,6 +53,7 @@ export function buildPaymentSlipView(slip: PaymentSlip) {
       words: numberToWords(Math.max(total, 0), currency.major, currency.minor),
     },
     page: { width: pageWidth, height: pageHeight },
-    themeColor: slip.company.themeColor || '#0b1f3a',
+    font: customDesign?.font || 'helvetica',
+    themeColor: customDesign?.color || slip.company.themeColor || '#0b1f3a',
   }
 }

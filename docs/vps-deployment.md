@@ -99,3 +99,9 @@ Add these under **Settings → Secrets and variables → Actions**:
 - Variable: `VITE_GOOGLE_CLIENT_ID`, containing the public Google OAuth client ID if Google integration is enabled
 
 The workflow runs on pushes to `main` and can also be started manually from **Actions → Deploy Sliply Web → Run workflow**.
+
+## Build configuration
+
+The workflow builds with `VITE_API_BASE_URL`, `VITE_COGNITO_USER_POOL_ID` and `VITE_COGNITO_CLIENT_ID` (public identifiers, defaults in the workflow, overridable with repository variables of the same name). The API only accepts browser calls from origins listed in its `Cors__AllowedOrigins`, so the production site must be served from `https://slipy.hsclogic.com`.
+
+Every push to `main` deploys. Merge feature branches into `dev` first, then merge `dev` into `main`.

@@ -13,6 +13,18 @@ class MemoryStorage implements Storage {
 }
 
 describe('safe persisted data loading', () => {
+  it('persists document designs and falls back for unsupported values', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    for (const template of ['classic', 'minimal', 'modern'] as const) {
+      slip.payment.template = template
+      saveDraft(storage, slip)
+      expect(loadDraft(storage, createBasicSlip())?.payment.template).toBe(template)
+    }
+    storage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...slip, payment: { ...slip.payment, template: 'unknown' } }))
+    expect(loadDraft(storage, createBasicSlip())?.payment.template).toBe('classic')
+  })
+
   it('parses valid JSON and safely handles invalid, empty, and null values', () => {
     expect(safeParse('{"ok":true}')).toEqual({ ok: true })
     expect(safeParse('{invalid')).toBeNull()
@@ -143,7 +155,7 @@ describe('safe persisted data loading', () => {
 
     const loaded = loadDraft(storage, createBasicSlip())
     expect(loaded?.company.themeColor).toBe('#123456')
-    expect(loaded?.payment).toMatchObject({ currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait', status: 'draft', paidDate: '', paidReference: '' })
+    expect(loaded?.payment).toMatchObject({ documentType: 'payment-slip', customDocumentType: '', customPaymentMethod: '', currency: 'LKR', sealText: '', paperSize: 'a4', orientation: 'portrait', status: 'draft', paidDate: '', paidReference: '' })
     expect(loaded?.adjustments).toEqual([])
   })
 
@@ -203,6 +215,17 @@ describe('safe persisted data loading', () => {
     expect(loadTheme(storage)).toBe('dark')
     storage.setItem(STORAGE_KEYS.theme, 'unknown')
     expect(loadTheme(storage)).toBe('dark')
+  })
+
+  it('round-trips custom document identity and custom payment method', () => {
+    const storage = new MemoryStorage()
+    const slip = createBasicSlip()
+    slip.payment.documentType = 'other'
+    slip.payment.customDocumentType = 'Payment Voucher'
+    slip.payment.method = 'Other'
+    slip.payment.customPaymentMethod = 'Mobile Money'
+    expect(saveDraft(storage, slip).success).toBe(true)
+    expect(loadDraft(storage, createBasicSlip())?.payment).toMatchObject({ documentType: 'other', customDocumentType: 'Payment Voucher', method: 'Other', customPaymentMethod: 'Mobile Money' })
   })
 
   it('distinguishes a missing profile from a valid returning-user profile', () => {

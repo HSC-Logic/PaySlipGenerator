@@ -10,6 +10,17 @@ const formats = [
 ] as const
 
 describe('PDF document generation', () => {
+  it('exports every document design with its content intact', () => {
+    const outputs = ['classic', 'minimal', 'modern'].map(template => {
+      const slip = createBasicSlip()
+      slip.payment.template = template as 'classic' | 'minimal' | 'modern'
+      const output = buildPdf(slip).output()
+      expect(output).toContain(slip.payment.reference)
+      return output.split('endstream')[0]
+    })
+    expect(new Set(outputs).size).toBe(3)
+  })
+
   it('builds a reusable non-empty PDF without initiating a download', () => {
     const pdf = buildPdf(createBasicSlip())
     expect(pdf.output('arraybuffer').byteLength).toBeGreaterThan(3000)
@@ -21,8 +32,25 @@ describe('PDF document generation', () => {
 
   it('creates a filesystem-safe, meaningful filename', () => {
     const slip = createBasicSlip()
-    slip.recipient.name = 'A Recipient / Accounts'
-    expect(pdfFilename(slip)).toBe('Payment-Slip-PAY-001-A-Recipient-Accounts.pdf')
+    slip.payment.documentType = 'other'
+    slip.payment.customDocumentType = 'Service / Estimate'
+    expect(pdfFilename(slip)).toBe('service-estimate-PAY-001.pdf')
+  })
+
+  it('renders the selected document heading and resolved custom payment method', () => {
+    const slip = createBasicSlip()
+    slip.payment.documentType = 'invoice'
+    slip.payment.method = 'Other'
+    slip.payment.customPaymentMethod = 'Wise Business'
+    const output = buildPdf(slip).output()
+    expect(output).toContain('INVOICE')
+    expect(output).toContain('Wise Business')
+    expect(output).not.toContain('PAYMENT SLIP')
+  })
+
+  it('applies the effective Free or Pro branding choice without changing the renderer', () => {
+    expect(buildPdf(createBasicSlip(), { showBranding: false }).output()).not.toContain('Generated with Sliply')
+    expect(buildPdf(createBasicSlip(), { showBranding: true }).output()).toContain('Generated with Sliply')
   })
 
   describe('page dimensions and geometry', () => {

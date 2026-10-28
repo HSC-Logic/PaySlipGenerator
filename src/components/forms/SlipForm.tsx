@@ -1,8 +1,10 @@
+import { DesignPicker } from './DesignPicker'
 import { Building2, Contact, CreditCard, FileText, LayoutTemplate, Palette, Plus, RefreshCw, Save, Trash2, Upload } from 'lucide-react'
 import type { ChangeEvent } from 'react'
 import type { Errors, PaymentSlip, PaymentStatus, SavedRecipient, WorkflowStep } from '../../types'
 import { calculatePaymentTotals, currencies, formatCurrency } from '../../utils/currency'
 import { changePaymentStatus, paymentStatusLabels, paymentStatuses } from '../../utils/paymentStatus'
+import { normalizeLogo } from '../../utils/logoImage'
 import { Field, Input, Select, TextArea } from '../common/Field'
 
 interface Props { slip: PaymentSlip; errors: Errors; step: Exclude<WorkflowStep, 'review'>; quickMode: boolean; hasCompanyProfile: boolean; savedRecipients: SavedRecipient[]; selectedRecipientId: string; onChange: (next: PaymentSlip) => void; onReference: () => void; onSaveCompany: () => void; onClearCompany: () => void; onSelectRecipient: (id: string) => void; onSaveRecipient: () => void; onDeleteRecipient: () => void; onLogoError: (message: string) => void; onSubmit: () => void }
@@ -15,9 +17,10 @@ export function SlipForm({ slip, errors, step, quickMode, hasCompanyProfile, sav
   const numericValue = (value: string) => value === '' ? '' : Number(value)
   const logo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return
+    event.target.value = ''
     if (!file.type.startsWith('image/')) return onLogoError('Please select an image file.')
-    if (file.size > 2 * 1024 * 1024) return onLogoError('Logo must be smaller than 2 MB.')
-    const reader = new FileReader(); reader.onload = () => set('company', 'logo', String(reader.result)); reader.readAsDataURL(file)
+    // Same normalisation as the cloud: at most 600 px, PNG (JPEG fallback), 512 KB, so browser and cloud documents share logos.
+    normalizeLogo(file).then(url => onChange({ ...slip, company: { ...slip.company, logo: url, logoId: undefined } }), reason => onLogoError(reason instanceof Error ? reason.message : 'Could not use that logo.'))
   }
   const setItem = (i: number, key: string, value: string | number) => onChange({ ...slip, items: slip.items.map((item, index) => index === i ? { ...item, [key]: value } : item) })
   const setAdjustment = (i: number, key: string, value: string | number) => onChange({ ...slip, adjustments: slip.adjustments.map((entry, index) => index === i ? { ...entry, [key]: value } : entry) })
@@ -28,6 +31,7 @@ export function SlipForm({ slip, errors, step, quickMode, hasCompanyProfile, sav
       <div className="field-grid"><Field label="Company name" required errorKey={errors['company.name'] ? 'company.name' : undefined} error={errors['company.name']}><Input required autoComplete="organization" value={slip.company.name} onChange={e => set('company', 'name', e.target.value)} /></Field><Field label="Registration number"><Input value={slip.company.registrationNumber} onChange={e => set('company', 'registrationNumber', e.target.value)} /></Field></div>
       <Field label="Company address" required errorKey={errors['company.address'] ? 'company.address' : undefined} error={errors['company.address']}><TextArea required autoComplete="street-address" value={slip.company.address} onChange={e => set('company', 'address', e.target.value)} /></Field>
       <Advanced quick={quickMode}>
+      <DesignPicker slip={slip} onChange={onChange} />
       <div className="field-grid"><Field label="Telephone"><Input type="tel" autoComplete="tel" value={slip.company.telephone} onChange={e => set('company', 'telephone', e.target.value)} /></Field><Field label="Email" errorKey={errors['company.email'] ? 'company.email' : undefined} error={errors['company.email']}><Input type="email" autoComplete="email" value={slip.company.email} onChange={e => set('company', 'email', e.target.value)} /></Field></div>
       <div className="field-grid"><Field label="Authorized person"><Input value={slip.company.authorizedName} onChange={e => set('company', 'authorizedName', e.target.value)} /></Field><Field label="Designation"><Input value={slip.company.authorizedDesignation} onChange={e => set('company', 'authorizedDesignation', e.target.value)} /></Field></div>
       <Field label="Company theme color" errorKey={errors['company.themeColor'] ? 'company.themeColor' : undefined} error={errors['company.themeColor']} hint="Used for headings, totals, borders, and the optional seal."><div className="color-control"><Input id="company-theme-picker" type="color" value={/^#[0-9a-f]{6}$/i.test(slip.company.themeColor) ? slip.company.themeColor : '#0b1f3a'} onChange={e => set('company', 'themeColor', e.target.value)} aria-label="Choose company theme color" /><Input id="company-theme-hex" value={slip.company.themeColor} pattern="#[0-9A-Fa-f]{6}" maxLength={7} onChange={e => set('company', 'themeColor', e.target.value)} aria-label="Company theme color hex value" /><Palette /></div></Field>
@@ -55,13 +59,16 @@ export function SlipForm({ slip, errors, step, quickMode, hasCompanyProfile, sav
     </Section>
     </Advanced>
     <Section icon={<CreditCard />} title="Payment details">
+      <Field label="Document type"><Select value={slip.payment.documentType ?? 'payment-slip'} onChange={e => set('payment', 'documentType', e.target.value)}><option value="payment-slip">Payment Slip</option><option value="invoice">Invoice</option><option value="quotation">Quotation</option><option value="other">Other</option></Select></Field>
+      {slip.payment.documentType === 'other' && <Field label="Custom document type" required errorKey={errors['payment.customDocumentType'] ? 'payment.customDocumentType' : undefined} error={errors['payment.customDocumentType']}><Input required maxLength={80} placeholder="e.g. Receipt, Service Estimate, Payment Voucher" value={slip.payment.customDocumentType ?? ''} onChange={e => set('payment', 'customDocumentType', e.target.value)} /></Field>}
       <div className="field-grid"><Field label="Payment date" required errorKey={errors['payment.date'] ? 'payment.date' : undefined} error={errors['payment.date']}><Input required type="date" value={slip.payment.date} onChange={e => set('payment', 'date', e.target.value)} /></Field><Field label="Payment reference" required errorKey={errors['payment.reference'] ? 'payment.reference' : undefined} error={errors['payment.reference']}><div className="input-action"><Input required value={slip.payment.reference} onChange={e => set('payment', 'reference', e.target.value)} /><button type="button" title="Generate reference" aria-label="Generate payment reference" onClick={onReference}><RefreshCw /></button></div></Field></div>
       <Field label="Payment title / purpose" required errorKey={errors['payment.title'] ? 'payment.title' : undefined} error={errors['payment.title']}><Input required value={slip.payment.title} onChange={e => set('payment', 'title', e.target.value)} /></Field>
       <Field label="Currency"><Select value={slip.payment.currency} onChange={e => set('payment', 'currency', e.target.value)}>{Object.entries(currencies).map(([code, config]) => <option key={code} value={code}>{code} — {config.symbol}</option>)}</Select></Field>
       <Advanced quick={quickMode}>
       <Field label="Payment status"><Select value={slip.payment.status} onChange={e => onChange({ ...slip, payment: changePaymentStatus(slip.payment, e.target.value as PaymentStatus) })}>{paymentStatuses.map(status => <option key={status} value={status}>{paymentStatusLabels[status]}</option>)}</Select></Field>
       {slip.payment.status === 'paid' && <div className="field-grid"><Field label="Paid date" hint="Optional" errorKey={errors['payment.paidDate'] ? 'payment.paidDate' : undefined} error={errors['payment.paidDate']}><Input type="date" value={slip.payment.paidDate} onChange={e => set('payment', 'paidDate', e.target.value)} /></Field><Field label="Paid reference" hint="Optional receipt, transfer, or settlement reference"><Input value={slip.payment.paidReference} onChange={e => set('payment', 'paidReference', e.target.value)} /></Field></div>}
-      <Field label="Payment method"><Select value={slip.payment.method} onChange={e => set('payment', 'method', e.target.value)}><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>Other</option></Select></Field>
+      <Field label="Payment method"><Select value={slip.payment.method} onChange={e => set('payment', 'method', e.target.value)}><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>Online Payment</option><option>Other</option></Select></Field>
+      {slip.payment.method === 'Other' && <Field label="Custom payment method" required errorKey={errors['payment.customPaymentMethod'] ? 'payment.customPaymentMethod' : undefined} error={errors['payment.customPaymentMethod']}><Input required maxLength={80} placeholder="e.g. PayPal, Wise, Mobile Payment" value={slip.payment.customPaymentMethod ?? ''} onChange={e => set('payment', 'customPaymentMethod', e.target.value)} /></Field>}
       <Field label="Bank name"><Input value={slip.payment.bankName} onChange={e => set('payment', 'bankName', e.target.value)} /></Field>
       <Field label="Bank / transaction reference"><Input value={slip.payment.transactionReference} onChange={e => set('payment', 'transactionReference', e.target.value)} /></Field>
       </Advanced>

@@ -1,6 +1,8 @@
-import type { AppSettings, Company, CompanyProfile, CurrencyCode, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
+import { customDesignKey, parseCustomDesign } from './customDesigns'
+import type { AppSettings, Company, CompanyProfile, CurrencyCode, DocumentType, PageOrientation, PaperSize, PaymentMethod, PaymentRecord, PaymentSlip, PaymentStatus, SavedRecipient, TotalAdjustment } from '../types'
 
 export const STORAGE_KEYS = {
+  customDesigns: customDesignKey,
   company: 'payment-slip-company',
   draft: 'payment-slip-draft',
   theme: 'payment-slip-theme',
@@ -8,6 +10,7 @@ export const STORAGE_KEYS = {
   recipients: 'payment-slip-recipients',
   history: 'payment-slip-history',
   settings: 'payment-slip-settings',
+  attribution: 'payment-slip-attribution',
 } as const
 
 type RecordValue = Record<string, unknown>
@@ -119,7 +122,7 @@ const adjustmentFrom = (value: unknown): TotalAdjustment | null => {
  * supplied defaults; unknown fields are ignored. Core sections and items must
  * still have the expected runtime shape before a draft is accepted.
  */
-const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
+export const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | null => {
   if (!isRecord(value) || !isRecord(value.company) || !isRecord(value.recipient) || !isRecord(value.payment)) return null
   const company = companyFrom(value.company, defaults.company)
   if (!company) return null
@@ -155,11 +158,14 @@ const paymentSlipFrom = (value: unknown, defaults: PaymentSlip): PaymentSlip | n
       address: text(recipient.address, defaults.recipient.address), email: text(recipient.email, defaults.recipient.email), telephone: text(recipient.telephone, defaults.recipient.telephone),
     },
     payment: {
+      documentType: oneOf<DocumentType>(payment.documentType, ['payment-slip', 'invoice', 'quotation', 'other'], 'payment-slip'), customDocumentType: text(payment.customDocumentType, ''),
       date: text(payment.date, defaults.payment.date), reference: text(payment.reference, defaults.payment.reference), title: text(payment.title, defaults.payment.title),
-      method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Other'], defaults.payment.method),
+      method: oneOf<PaymentMethod>(payment.method, ['Cash', 'Bank Transfer', 'Cheque', 'Online Payment', 'Other'], defaults.payment.method), customPaymentMethod: text(payment.customPaymentMethod, ''),
       status: oneOf<PaymentStatus>(payment.status, ['draft', 'pending', 'paid', 'cancelled'], 'draft'), paidDate: text(payment.paidDate, ''), paidReference: text(payment.paidReference, ''),
       bankName: text(payment.bankName, defaults.payment.bankName), transactionReference: text(payment.transactionReference, defaults.payment.transactionReference), notes: text(payment.notes, defaults.payment.notes),
       adjustment: numeric(payment.adjustment, defaults.payment.adjustment), currency: oneOf<CurrencyCode>(payment.currency, ['LKR', 'USD', 'EUR', 'GBP', 'INR', 'AUD', 'CAD', 'SGD'], 'LKR'),
+      ...(parseCustomDesign(payment.customDesign) ? { customDesign: parseCustomDesign(payment.customDesign) } : {}),
+      ...(payment.template === undefined ? {} : { template: oneOf(payment.template, ['classic', 'minimal', 'modern'] as const, 'classic') }),
       sealText: text(payment.sealText, defaults.payment.sealText), paperSize: oneOf<PaperSize>(payment.paperSize, ['a4', 'a5', 'b5', 'letter'], defaults.payment.paperSize),
       orientation: oneOf<PageOrientation>(payment.orientation, ['portrait', 'landscape'], defaults.payment.orientation),
     },
@@ -195,7 +201,8 @@ export const loadHistory = (storage: Storage, defaults: PaymentSlip): PaymentRec
     seen.add(id)
     const createdAt = wrapped && typeof entry.createdAt === 'number' && Number.isFinite(entry.createdAt) ? entry.createdAt : 0
     const updatedAt = wrapped && typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) ? entry.updatedAt : createdAt
-    return [{ id, createdAt, updatedAt, slip }]
+    const savedUnderPlan = wrapped && (entry.savedUnderPlan === 'free' || entry.savedUnderPlan === 'pro') ? entry.savedUnderPlan : undefined
+    return [{ id, createdAt, updatedAt, slip, ...(savedUnderPlan ? { savedUnderPlan } : {}) }]
   })
 }
 
@@ -239,6 +246,9 @@ export const loadSettings = (storage: Storage): AppSettings => {
   }
   return { ...DEFAULT_SETTINGS, theme: loadLegacyTheme(storage) ?? DEFAULT_SETTINGS.theme }
 }
+/** Pro-only browser preference: true keeps the “Generated with Sliply” footer (the default). */
+export const loadShowAttribution = (storage: Storage) => safeGet(storage, STORAGE_KEYS.attribution) !== 'hidden'
+export const saveShowAttribution = (storage: Storage, show: boolean) => show ? safeRemove(storage, STORAGE_KEYS.attribution) : safeSet(storage, STORAGE_KEYS.attribution, 'hidden')
 export const saveSettings = (storage: Storage, settings: AppSettings) => safeSet(storage, STORAGE_KEYS.settings, JSON.stringify(envelope(settings)))
 export const loadTheme = (storage: Storage): 'light' | 'dark' | null => { const theme = loadSettings(storage).theme; return theme === 'system' ? null : theme }
 export const saveTheme = (storage: Storage, theme: 'light' | 'dark') => saveSettings(storage, { ...loadSettings(storage), theme })
