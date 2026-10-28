@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { adjustmentAmount, calculatePaymentTotals, finalTotal, formatCurrency, itemAmount, subtotal } from './currency'
+import vectors from './__fixtures__/payment-totals.json'
 const items = [{ id: '1', description: 'Consulting', quantity: 2, rate: 1500 }, { id: '2', description: 'Travel', quantity: 1, rate: 500 }]
 describe('payment calculations', () => {
   it('calculates a line amount', () => expect(itemAmount(items[0])).toBe(3000))
@@ -26,5 +27,11 @@ describe('payment calculations', () => {
   it('rounds percentage adjustments to the nearest minor unit in the shared calculation', () => {
     const result = calculatePaymentTotals([{ id: 'x', description: 'Item', quantity: 1, rate: 10.01 }], 0.1, [{ id: 'v', label: 'VAT', kind: 'tax', mode: 'percentage', value: 17.5 }])
     expect(result).toEqual({ itemAmounts: [10.01], subtotal: 10.01, adjustmentAmounts: [1.75], final: 11.86 })
+  })
+})
+
+describe('shared payment totals vectors', () => {
+  it.each(vectors.cases)('matches the shared vector: $name', ({ items, adjustment, adjustments, expected }) => {
+    expect(calculatePaymentTotals(items as any, adjustment as any, adjustments as any)).toEqual(expected)
   })
 })

@@ -3,7 +3,7 @@ import { createBasicSlip } from '../../test/fixtures/paymentSlips'
 
 vi.stubEnv('VITE_API_BASE_URL', 'https://api.test/api/v1')
 vi.mock('../cognito/auth', () => ({ getAccessContext: async () => ({ token: 't', pro: true, lapsed: false }) }))
-const { ApiCompanyRepository, ApiPaymentRepository, ApiRecipientRepository, paymentQuery } = await import('./apiRepository')
+const { ApiCompanyRepository, ApiDesignRepository, ApiPaymentRepository, ApiRecipientRepository, paymentQuery } = await import('./apiRepository')
 
 afterEach(() => vi.unstubAllGlobals())
 const calls = (mock: ReturnType<typeof vi.fn>) => mock.mock.calls as unknown as [string, RequestInit][]
@@ -31,8 +31,16 @@ describe('ApiPaymentRepository', () => {
   })
   it('reserves the next reference with POST /companies/{id}/references', async () => {
     const mock = stub(Response.json({ reference: 'PS-2026-0042' }))
-    await expect(new ApiPaymentRepository().nextReference('c 1')).resolves.toBe('PS-2026-0042')
-    expect(calls(mock)[0][0]).toBe('https://api.test/api/v1/companies/c%201/references'); expect(calls(mock)[0][1].method).toBe('POST')
+    await expect(new ApiPaymentRepository().nextReference('c 1', 'Asia/Colombo')).resolves.toBe('PS-2026-0042')
+    expect(calls(mock)[0][0]).toBe('https://api.test/api/v1/companies/c%201/references?tz=Asia%2FColombo'); expect(calls(mock)[0][1].method).toBe('POST')
+  })
+  it('defaults the reference time zone to the browser zone and omits tz when unknown', async () => {
+    const mock = stub(Response.json({ reference: 'PS-2026-0001' }), Response.json({ reference: 'PS-2026-0002' }))
+    await new ApiPaymentRepository().nextReference('c1')
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    expect(calls(mock)[0][0]).toBe(`https://api.test/api/v1/companies/c1/references${zone ? `?tz=${encodeURIComponent(zone)}` : ''}`)
+    await new ApiPaymentRepository().nextReference('c1', '')
+    expect(calls(mock)[1][0]).toBe('https://api.test/api/v1/companies/c1/references')
   })
   it('treats 404 on get as missing', async () => { stub(new Response('{}', { status: 404 })); await expect(new ApiPaymentRepository().get('x')).resolves.toBeNull() })
 })
@@ -52,5 +60,27 @@ describe('company and recipient repositories', () => {
     const repo = new ApiRecipientRepository()
     expect((await repo.list())[0]).toMatchObject({ id: 'r1', name: 'Sam', identification: '' })
     await repo.archive('r1'); expect(calls(mock)[1][1].method).toBe('DELETE')
+  })
+})
+
+describe('ApiDesignRepository', () => {
+  const row = { id: 'd1', version: 1, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', name: 'Mine', layout: 'modern', color: '#123456', font: 'times' }
+  it('reads flat designs, skipping rows that are not valid designs', async () => {
+    stub(Response.json([row, { ...row, id: 'd2', font: 'comic' }]))
+    const designs = await new ApiDesignRepository().list()
+    expect(designs).toEqual([{ id: 'd1', version: 1, createdAt: Date.parse('2026-10-01T00:00:00Z'), updatedAt: Date.parse('2026-10-01T00:00:00Z'), name: 'Mine', layout: 'modern', color: '#123456', font: 'times' }])
+  })
+  it('creates with POST and replaces with PUT carrying the version', async () => {
+    const mock = stub(Response.json(row), Response.json({ ...row, version: 2, color: '#654321' }))
+    const repo = new ApiDesignRepository(); const design = { name: 'Mine', layout: 'modern' as const, color: '#123456', font: 'times' as const }
+    const created = await repo.create(design)
+    const updated = await repo.update(created.id, { ...design, color: '#654321' }, created.version)
+    expect(calls(mock).map(([url, init]) => `${init.method} ${url}`)).toEqual(['POST https://api.test/api/v1/designs', 'PUT https://api.test/api/v1/designs/d1'])
+    expect(JSON.parse(String(calls(mock)[0][1].body))).toEqual(design)
+    expect(JSON.parse(String(calls(mock)[1][1].body))).toEqual({ ...design, color: '#654321', version: 1 }); expect(updated.version).toBe(2)
+  })
+  it('reports a duplicate name as name-taken', async () => {
+    stub(new Response(JSON.stringify({ type: 'https://slipy.hsclogic.link/problems/name-taken' }), { status: 409 }))
+    await expect(new ApiDesignRepository().create({ name: 'Mine', layout: 'modern', color: '#123456', font: 'times' })).rejects.toMatchObject({ kind: 'name-taken', status: 409 })
   })
 })

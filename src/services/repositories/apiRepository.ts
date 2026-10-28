@@ -1,11 +1,12 @@
-import type { CloudCompany, CloudPaymentRecord, CloudRecipient, PaymentSlip, PaymentSlipFilters } from '../../types'
+import type { CloudCompany, CloudDesign, CustomDesign, CloudPaymentRecord, CloudRecipient, PaymentSlip, PaymentSlipFilters } from '../../types'
 import { apiFetch } from '../api/client'
-import type { CompanyRepository, PaymentPage, PaymentSlipRepository, RecipientRepository } from './contracts'
-import { companyFromDto, companyToDto, recipientFromDto, recipientToDto, recordFromDto, slipToDto } from './mappers'
+import type { CompanyRepository, DesignRepository, PaymentPage, PaymentSlipRepository, RecipientRepository } from './contracts'
+import { companyFromDto, designFromDto, designToDto, companyToDto, recipientFromDto, recipientToDto, recordFromDto, slipToDto } from './mappers'
 
 const PAGE_SIZE = 100
 const json = (body: unknown) => JSON.stringify(body)
 const itemsOf = (payload: unknown): Record<string, any>[] => Array.isArray(payload) ? payload : Array.isArray((payload as { items?: unknown } | null)?.items) ? (payload as { items: Record<string, any>[] }).items : []
+const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined } catch { return undefined } }
 const encode = (id: string) => encodeURIComponent(id)
 
 /** Rows the server has not stored yet carry no `version`; those are created with POST, the rest replaced with PUT. */
@@ -24,6 +25,14 @@ export class ApiRecipientRepository implements RecipientRepository {
     return recipientFromDto(recipient.version === undefined ? await apiFetch('/recipients', { method: 'POST', body }) : await apiFetch(`/recipients/${encode(recipient.id)}`, { method: 'PUT', body }))
   }
   async archive(id: string) { await apiFetch(`/recipients/${encode(id)}`, { method: 'DELETE' }) }
+}
+
+export class ApiDesignRepository implements DesignRepository {
+  async list(): Promise<CloudDesign[]> { return itemsOf(await apiFetch('/designs')).flatMap(row => { const design = designFromDto(row); return design ? [design] : [] }) }
+  private read(row: Record<string, any>): CloudDesign { const design = designFromDto(row); if (!design) throw new Error('The server returned a design that could not be read.'); return design }
+  async create(design: CustomDesign) { return this.read(await apiFetch('/designs', { method: 'POST', body: json(designToDto(design)) })) }
+  async update(id: string, design: CustomDesign, version: number) { return this.read(await apiFetch(`/designs/${encode(id)}`, { method: 'PUT', body: json(designToDto({ ...design, version })) })) }
+  async remove(id: string) { await apiFetch(`/designs/${encode(id)}`, { method: 'DELETE' }) }
 }
 
 export const paymentQuery = (filters: PaymentSlipFilters = {}, cursor?: string | null, limit = PAGE_SIZE) => {
@@ -48,8 +57,10 @@ export class ApiPaymentRepository implements PaymentSlipRepository {
     return recordFromDto(await apiFetch(`/payment-slips/${encode(id)}`, { method: 'PUT', body: json(slipToDto(slip, companyId, recipientId, expected)) }))
   }
   async remove(id: string) { await apiFetch(`/payment-slips/${encode(id)}`, { method: 'DELETE' }) }
-  async nextReference(companyId: string) {
-    const result = await apiFetch<string | { reference?: string }>(`/companies/${encode(companyId)}/references`, { method: 'POST' })
+  /** `timeZone` (IANA) decides which year the reference carries; it defaults to this browser's zone, the server's default is UTC. */
+  async nextReference(companyId: string, timeZone: string | undefined = browserTimeZone()) {
+    const query = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : ''
+    const result = await apiFetch<string | { reference?: string }>(`/companies/${encode(companyId)}/references${query}`, { method: 'POST' })
     const reference = typeof result === 'string' ? result : result?.reference
     if (!reference) throw new Error('The server did not return a reference.')
     return reference
