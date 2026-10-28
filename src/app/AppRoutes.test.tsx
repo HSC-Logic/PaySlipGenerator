@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { AppRoutes } from './AppRoutes'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+vi.stubEnv('VITE_COGNITO_USER_POOL_ID', '')
+vi.stubEnv('VITE_COGNITO_CLIENT_ID', '')
+const { AppRoutes } = await import('./AppRoutes')
 afterEach(()=>{cleanup();window.location.hash=''})
 describe('application routes without cloud configuration',()=>{
   it('keeps guest creation available',()=>{window.location.hash='#/';render(<AppRoutes/>);expect(screen.getByText('Create a quick payment slip')).toBeTruthy()})
