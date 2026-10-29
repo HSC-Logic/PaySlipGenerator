@@ -1,8 +1,8 @@
+import { FilePlus2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Logo } from './Logo'
 
 export function BrandHeader() {
-  return <Link className="brand-header" to="/" aria-label="Sliply home"><Logo size={36} /><strong>Sliply</strong></Link>
+  return <Link className="brand-header" to="/" aria-label="Sliply home"><span className="brand-mark"><FilePlus2 /></span><strong>Sliply</strong></Link>
 }
 
 export function DeveloperMark() {

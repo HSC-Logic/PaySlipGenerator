@@ -487,12 +487,3 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
 @media (max-width: 760px), (pointer: coarse) {
   .creation-mode button, .mobile-view-switch button, .workspace-tool-tabs button, .form-pane .button, .action-dock .button, .header-actions .button, .workflow-navigation .button { min-height: 44px; }
 }
-
-/* Logo mark */
-:root { --logo-tile: #0d5c63; }
-[data-theme=dark] { --logo-tile: #4fb3bc; }
-.logo { flex-shrink: 0; display: block; }
-.cloud-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.app-brand { display: flex; align-items: center; gap: 10px; }
-.app-header .logo, .cloud-shell > header .logo { --logo-tile: #083c41; }
-[data-theme=dark] .app-header .logo, [data-theme=dark] .cloud-shell > header .logo { --logo-tile: #4fb3bc; }
