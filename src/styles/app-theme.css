@@ -72,7 +72,6 @@ h1, h2, h3, strong { font-family: var(--font-ui); }
 [data-theme=dark] .app-header, [data-theme=dark] .cloud-shell > header { background: var(--surface); border-bottom: 1px solid var(--line); color: var(--text); }
 .app-brand strong, .cloud-brand { font: 700 18px var(--font-ui); color: inherit; letter-spacing: -0.01em; }
 .app-brand span { color: color-mix(in srgb, currentColor 70%, transparent); font-size: 12px; letter-spacing: 0; }
-.brand-mark { background: var(--accent); color: color-mix(in srgb, var(--accent) 16%, #000); border-radius: 8px; width: 34px; height: 34px; }
 .header-account { color: inherit; font: 600 13px var(--font-ui); padding: 7px 12px; border-radius: var(--radius); text-decoration: none; }
 .header-account:hover { background: rgb(255 255 255 / 0.14); }
 .theme-toggle { background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.28); color: inherit; font: 600 12px var(--font-ui); border-radius: var(--radius); }
