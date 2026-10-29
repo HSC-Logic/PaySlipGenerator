@@ -380,3 +380,22 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
 .quick-save-options small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .quick-save-actions { display: flex; justify-content: flex-end; gap: 10px; }
 @media (max-width: 480px) { .quick-save-actions { flex-direction: column-reverse; } .quick-save-actions .button { width: 100%; } }
+
+/* Add / edit modal for companies and recipients */
+.page-heading { justify-content: space-between; margin-bottom: 8px; }
+.app-modal { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop); overflow: auto; }
+.app-modal::backdrop { background: rgb(8 14 15 / 0.6); }
+.app-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 0; }
+.app-modal-head h2 { margin: 0; font: 700 18px var(--font-ui); letter-spacing: -0.01em; }
+.icon-close { width: 36px; height: 36px; border: 0; border-radius: var(--radius); background: transparent; color: var(--muted); font: 400 24px/1 var(--font-ui); cursor: pointer; }
+.icon-close:hover { background: var(--surface-2); color: var(--text); }
+.management-form.modal-form { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 18px 24px 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.modal-form .wide { grid-column: 1 / -1; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 6px; }
+.modal-form .modal-actions .button { align-self: auto; }
+@media (max-width: 620px) {
+  .management-form.modal-form { grid-template-columns: 1fr; padding: 16px 18px 20px; }
+  .app-modal-head { padding: 16px 18px 0; }
+  .modal-actions { flex-direction: column-reverse; }
+  .modal-actions .button { width: 100%; }
+}
