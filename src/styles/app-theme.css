@@ -469,9 +469,12 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
   .table-wrap td[data-label=Status] select { width: 100%; }
   .table-wrap td.actions-cell { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line); }
   .table-wrap td.actions-cell::before { display: none; }
-  .table-wrap .row-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .table-wrap .row-actions > * { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); color: var(--text); font: 600 13px var(--font-ui); text-decoration: none; cursor: pointer; }
+  .table-wrap .row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .table-wrap .row-actions > * { flex: 1 1 80px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); color: var(--text); font: 600 13px var(--font-ui); text-decoration: none; cursor: pointer; }
   .table-wrap tbody tr:hover { background: var(--surface); }
+  .table-wrap td { align-content: start; }
+  .table-wrap td[data-label=Reference] a { color: var(--primary); }
+  .filter-grid input, .filter-grid select { min-width: 0; width: 100%; }
 }
 
 /* Editor inside the cloud shell on phones: one slim header, wrapped actions, 44px controls */
