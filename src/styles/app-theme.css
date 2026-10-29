@@ -346,3 +346,22 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
 .settings-card .settings-action > div[role=group] { display: grid; gap: 12px; width: 100%; max-width: 560px; }
 .settings-card .settings-action > div[role=group] > * { margin: 0; }
 .settings-card .settings-action p { margin: 0; }
+
+/* Phones: the tab strip scrolls with a visible edge, inputs stay at 16px so iOS does not zoom on focus */
+@media (max-width: 760px) {
+  .cloud-shell nav { scroll-snap-type: x proximity; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .cloud-shell nav::-webkit-scrollbar { display: none; }
+  .cloud-shell nav a { flex: 0 0 auto; scroll-snap-align: center; padding: 8px 12px; }
+  .cloud-shell nav a:last-child { margin-right: 24px; }
+  input, textarea, select { font-size: 16px; }
+  .settings-card { padding: 18px; }
+}
+
+/* Touch: 44px targets on coarse pointers */
+@media (pointer: coarse) {
+  .cloud-shell nav a, .cloud-shell .button, .cloud-page .button, .management-form .button, .record-button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .cloud-page input:not([type=checkbox]):not([type=radio]), .cloud-page select { min-height: 44px; }
+  .management-form label:has(> input[type=checkbox]) { min-height: 44px; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; }
+  .cloud-list li { gap: 10px; }
+}
