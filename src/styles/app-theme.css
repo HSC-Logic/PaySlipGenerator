@@ -396,8 +396,8 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
 @media (max-width: 620px) {
   .management-form.modal-form { grid-template-columns: 1fr; padding: 16px 18px 20px; }
   .app-modal-head { padding: 16px 18px 0; }
-  .modal-actions { flex-direction: column-reverse; }
-  .modal-actions .button { width: 100%; }
+  .modal-actions .button { flex: 1; }
+  .modal-actions .button.primary { flex: 2; }
 }
 
 /* Modal on phones: a bottom sheet with a fixed header and a footer that stays reachable */
@@ -444,3 +444,7 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
   .settings-row .settings-action, .settings-row .button { width: 100%; }
   .settings-row .settings-action .button { width: 100%; }
 }
+
+.settings-row .button { white-space: nowrap; }
+.settings-body .transfer-panel { padding: 16px 18px; }
+.settings-body .transfer-panel p:last-child { margin-bottom: 0; }
