@@ -22,16 +22,19 @@ const messages: Record<DocumentAction, { success: string; error: string }> = {
 
 /** One application boundary owns busy state and notifications for both output
  * actions. It never mutates or replaces the supplied payment state. */
-export async function runDocumentAction({ action, slip, build, download, print, setBusy, notify, reportError }: DocumentActionOptions) {
+/** Resolves true when the document was produced, so callers can offer follow-up steps only after a success. */
+export async function runDocumentAction({ action, slip, build, download, print, setBusy, notify, reportError }: DocumentActionOptions): Promise<boolean> {
   setBusy(action)
   try {
     const document = build(slip)
     if (action === 'download') await download(document, slip)
     else await print(document)
     notify('success', messages[action].success)
+    return true
   } catch (error) {
     reportError?.(error)
     notify('error', messages[action].error)
+    return false
   } finally {
     setBusy('')
   }
