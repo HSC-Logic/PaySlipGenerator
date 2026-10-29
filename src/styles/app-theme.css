@@ -448,3 +448,39 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
 .settings-row .button { white-space: nowrap; }
 .settings-body .transfer-panel { padding: 16px 18px; }
 .settings-body .transfer-panel p:last-child { margin-bottom: 0; }
+
+/* Payments on phones: filters in two columns, each payment as a card */
+@media (max-width: 760px) {
+  .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px; margin: 14px 0; }
+  .filter-grid > label:first-child, .filter-grid > .button { grid-column: 1 / -1; }
+  .page-heading { gap: 12px; }
+  .page-heading > .quick-actions { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .page-heading > .quick-actions .button { width: 100%; justify-content: center; }
+  .table-wrap { border: 0; background: transparent; overflow: visible; }
+  .table-wrap table { min-width: 0; display: block; }
+  .table-wrap thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .table-wrap tbody { display: grid; gap: 12px; }
+  .table-wrap tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+  .table-wrap td { display: grid; gap: 2px; padding: 0; border: 0; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+  .table-wrap td::before { content: attr(data-label); color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; }
+  .table-wrap td[data-label=Reference] { grid-column: 1 / -1; font: 700 15px var(--font-ui); }
+  .table-wrap td[data-label=Reference]::before { display: none; }
+  .table-wrap td[data-label=Total] { font-weight: 700; }
+  .table-wrap td[data-label=Status] select { width: 100%; }
+  .table-wrap td.actions-cell { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line); }
+  .table-wrap td.actions-cell::before { display: none; }
+  .table-wrap .row-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .table-wrap .row-actions > * { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); color: var(--text); font: 600 13px var(--font-ui); text-decoration: none; cursor: pointer; }
+  .table-wrap tbody tr:hover { background: var(--surface); }
+}
+
+/* Editor inside the cloud shell on phones: one slim header, wrapped actions, 44px controls */
+@media (max-width: 760px) {
+  .cloud-shell .app-header { height: auto; min-height: 48px; padding: 4px 15px; justify-content: flex-end; }
+  .cloud-shell .app-brand, .cloud-shell .header-status > a, .cloud-shell .privacy-pill { display: none; }
+  .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .header-actions .button { width: 100%; justify-content: center; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .creation-mode button, .mobile-view-switch button, .workspace-tool-tabs button, .form-pane .button, .action-dock .button, .header-actions .button, .workflow-navigation .button { min-height: 44px; }
+}
