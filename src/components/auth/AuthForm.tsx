@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { FilePlus2 } from 'lucide-react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { BrandHeader, DeveloperMark } from '../common/BrandHeader'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { cognitoConfigured, confirmPasswordReset, requestPasswordReset, signIn, type SignInResult } from '../../services/cognito/auth'
@@ -26,6 +26,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'forgot' }) {
   const needsPassword = mode === 'login' || step !== 'credentials'
   const title = mode === 'forgot' ? 'Reset password' : step === 'newPassword' ? 'Set a new password' : 'Sign in'
   const label = busy ? 'Please wait…' : mode === 'forgot' ? (step === 'credentials' ? 'Send code' : 'Update password') : step === 'newPassword' ? 'Set password' : 'Sign in'
+  // An already signed-in visitor never needs the sign-in form.
+  if (mode === 'login' && auth.user && !auth.loading && step === 'credentials') return <Navigate to={destination} replace />
   return <main className="auth-page"><BrandHeader /><form className="auth-card" onSubmit={submit}><h1>{title}</h1><p>Guest payment creation remains available without an account.</p>{!cognitoConfigured && <p className="auth-warning" role="status">Cloud features are not configured. Continue in guest mode.</p>}
     <label>Email or username<input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={step === 'newPassword'} value={email} onChange={event => setEmail(event.target.value)} /></label>
     {mode === 'forgot' && step === 'resetCode' && <label>Verification code<input required inputMode="numeric" autoComplete="one-time-code" value={code} onChange={event => setCode(event.target.value)} /></label>}
