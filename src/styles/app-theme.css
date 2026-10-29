@@ -317,3 +317,32 @@ input, textarea { caret-color: var(--primary); }
 .transfer-computers .cloud-list { margin-top: 6px; }
 @media (max-width: 620px) { .transfer-panel { padding: 14px; } .transfer-table { display: block; overflow-x: auto; } }
 .history-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+/* Form controls: checkboxes and file inputs must not inherit text-input sizing */
+input[type=checkbox], input[type=radio] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex-shrink: 0; cursor: pointer; }
+input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed; }
+input[type=file] { padding: 6px 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+input[type=file]::file-selector-button { margin-right: 10px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); color: var(--text); font: 600 12px var(--font-ui); cursor: pointer; }
+input[type=file]::file-selector-button:hover { border-color: var(--muted); }
+
+/* Management and filter forms: rows size to content, labels stay above their control */
+.management-form, .filter-grid { align-items: start; }
+.management-form label, .filter-grid label { align-content: start; }
+.management-form label:has(> input[type=checkbox]) { display: flex; align-items: center; gap: 10px; align-self: end; min-height: 40px; cursor: pointer; }
+.management-form label:has(> input[type=checkbox]:disabled) { cursor: not-allowed; color: var(--muted); }
+.management-form .button { align-self: end; }
+.cloud-page > label { display: grid; gap: 6px; max-width: 420px; margin: 0 0 16px; font: 600 12px var(--font-ui); color: var(--text); }
+
+/* Page rhythm */
+.cloud-page > h2 { margin: 28px 0 12px; font: 700 18px var(--font-ui); letter-spacing: -0.01em; color: var(--text); }
+.cloud-page > .quick-actions { margin: 0 0 8px; }
+.empty-state { margin: 0; padding: 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); color: var(--muted); }
+
+/* Settings cards */
+.settings-card { display: grid; gap: 12px; padding: 20px 24px; }
+.settings-card > * { margin: 0; }
+.settings-card h2 { font: 700 16px var(--font-ui); letter-spacing: -0.01em; color: var(--text); }
+.settings-card .settings-action { display: grid; gap: 10px; justify-items: start; }
+.settings-card .settings-action > div[role=group] { display: grid; gap: 12px; width: 100%; max-width: 560px; }
+.settings-card .settings-action > div[role=group] > * { margin: 0; }
+.settings-card .settings-action p { margin: 0; }
