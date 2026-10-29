@@ -27,7 +27,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'forgot' }) {
   const title = mode === 'forgot' ? 'Reset password' : step === 'newPassword' ? 'Set a new password' : 'Sign in'
   const label = busy ? 'Please wait…' : mode === 'forgot' ? (step === 'credentials' ? 'Send code' : 'Update password') : step === 'newPassword' ? 'Set password' : 'Sign in'
   return <main className="auth-page"><BrandHeader /><form className="auth-card" onSubmit={submit}><h1>{title}</h1><p>Guest payment creation remains available without an account.</p>{!cognitoConfigured && <p className="auth-warning" role="status">Cloud features are not configured. Continue in guest mode.</p>}
-    <label>Email<input type="email" required autoComplete="email" disabled={step === 'newPassword'} value={email} onChange={event => setEmail(event.target.value)} /></label>
+    <label>Email or username<input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={step === 'newPassword'} value={email} onChange={event => setEmail(event.target.value)} /></label>
     {mode === 'forgot' && step === 'resetCode' && <label>Verification code<input required inputMode="numeric" autoComplete="one-time-code" value={code} onChange={event => setCode(event.target.value)} /></label>}
     {needsPassword && <label>{step === 'credentials' ? 'Password' : 'New password'}<input type="password" required minLength={8} autoComplete={step === 'credentials' ? 'current-password' : 'new-password'} value={password} onChange={event => setPassword(event.target.value)} /></label>}
     <button className="button primary" disabled={busy || !cognitoConfigured}>{label}</button>{message && <p role="status">{message}</p>}
