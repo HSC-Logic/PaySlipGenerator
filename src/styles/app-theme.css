@@ -399,3 +399,48 @@ input[type=file]::file-selector-button:hover { border-color: var(--muted); }
   .modal-actions { flex-direction: column-reverse; }
   .modal-actions .button { width: 100%; }
 }
+
+/* Modal on phones: a bottom sheet with a fixed header and a footer that stays reachable */
+.app-modal:focus { outline: none; }
+.app-modal[open] { display: flex; flex-direction: column; overflow: hidden; }
+.app-modal[open] > .management-form { overflow-y: auto; overscroll-behavior: contain; }
+.management-form.modal-form { padding-bottom: 0; }
+.modal-form .modal-actions { position: sticky; bottom: 0; margin: 0 -24px; padding: 14px 24px; background: var(--surface); border-top: 1px solid var(--line); }
+@media (max-width: 620px) {
+  .app-modal { width: 100vw; max-width: none; margin: auto 0 0; max-height: 92dvh; border-radius: 16px 16px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .app-modal-head { padding: 14px 18px 10px; border-bottom: 1px solid var(--line); }
+  .modal-form .modal-actions { margin: 0 -18px; padding: 12px 18px; }
+  .modal-form .modal-actions .button { min-height: 44px; }
+}
+
+/* Settings: label-and-description on the left, the controls on the right; hairlines instead of stacked cards */
+.settings-page { max-width: 960px; }
+.settings-section { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 16px 48px; padding: 28px 0; border-top: 1px solid var(--line); }
+.settings-page h1 + .settings-section { margin-top: 20px; }
+.settings-section-head h2 { margin: 0 0 6px; font: 700 15px var(--font-ui); color: var(--text); }
+.settings-section-head p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.settings-body { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.settings-body > p { margin: 0; line-height: 1.55; max-width: 62ch; }
+.settings-facts { display: grid; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.settings-facts > div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; }
+.settings-facts > div + div { border-top: 1px solid var(--line); }
+.settings-facts dt { color: var(--muted); font: 600 13px var(--font-ui); }
+.settings-facts dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
+.plan-badge { display: inline-block; padding: 2px 10px; border-radius: var(--radius-pill, 99px); background: var(--surface-2); border: 1px solid var(--line-strong); font: 600 12px var(--font-ui); }
+.plan-badge.pro { background: var(--primary-soft); border-color: transparent; color: var(--primary); }
+.settings-note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.settings-row strong { display: block; font: 600 14px var(--font-ui); }
+.settings-row p { margin: 2px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.settings-row .settings-action { flex-shrink: 0; }
+.settings-danger .settings-row { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+.settings-danger > div[role=group] { display: grid; gap: 12px; max-width: 560px; padding: 18px; border: 1px solid color-mix(in srgb, var(--red) 35%, var(--line)); border-radius: var(--radius-lg); background: var(--surface); }
+.settings-danger > div[role=group] > * { margin: 0; }
+.settings-body .transfer-panel { margin: 0; box-shadow: none; }
+.settings-body .quick-actions { gap: 10px; }
+@media (max-width: 760px) {
+  .settings-section { grid-template-columns: 1fr; gap: 14px; padding: 22px 0; }
+  .settings-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .settings-row .settings-action, .settings-row .button { width: 100%; }
+  .settings-row .settings-action .button { width: 100%; }
+}
